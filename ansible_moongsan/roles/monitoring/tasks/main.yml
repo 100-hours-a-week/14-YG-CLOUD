@@ -1,0 +1,103 @@
+- name: Install dependencies for Docker
+  apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: yes
+  loop:
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - software-properties-common
+    - gnupg
+    - lsb-release
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker APT repository
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu jammy stable
+    state: present
+    filename: docker
+
+- name: Install Docker and Python bindings
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+      - python3-docker
+    state: present
+    update_cache: yes
+
+- name: Ensure Docker is running
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Create Grafana data directory
+  file:
+    path: /home/ubuntu/grafana/data
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+
+- name: Copy Docker Compose file for monitoring stack
+  copy:
+    src: docker-compose.monitoring.yml
+    dest: /home/ubuntu/docker-compose.monitoring.yml
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+
+- name: Copy Prometheus config
+  template:
+    src: prometheus.yml.j2
+    dest: /home/ubuntu/prometheus.yml
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+
+- name: Copy Filebeat config
+  template:
+    src: filebeat.yml.j2
+    dest: /home/ubuntu/filebeat.yml
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Run monitoring stack with Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: /home/ubuntu
+    files:
+      - docker-compose.monitoring.yml
+    state: present
+
+- name: Create k6-scripts directory
+  file:
+    path: /home/ubuntu/k6-scripts
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+
+- name: Copy scenario A test script
+  template:
+    src: k6-test.js.j2
+    dest: /home/ubuntu/k6-scripts/scenario_a.js
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+
+- name: Run k6 load test for scenario A
+  command: docker run --rm -v /home/ubuntu/k6-scripts:/scripts grafana/k6 run /scripts/scenario_a.js
+  register: k6_output_a
+
+- name: Print k6 output
+  debug:
+    var: k6_output_a.stdout_lines

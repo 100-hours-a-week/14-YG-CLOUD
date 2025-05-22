@@ -1,0 +1,19 @@
+[Unit]
+Description=Spring Boot Backend for Moongsan
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/14-YG-BE
+EnvironmentFile=/home/ubuntu/14-YG-BE/.env.prod
+ExecStart=/usr/bin/java -jar /home/ubuntu/14-YG-BE/build/libs/moongsan-backend-0.0.1-SNAPSHOT.jar
+StandardOutput=append:/home/ubuntu/logs/be_moongsan.log
+StandardError=append:/home/ubuntu/logs/be_moongsan.log
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=15
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Install]
+WantedBy=multi-user.target

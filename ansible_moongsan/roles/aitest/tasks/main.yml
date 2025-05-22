@@ -1,0 +1,161 @@
+- name: Clone AI repo if not present
+  git:
+    repo: https://github.com/100-hours-a-week/14-YG-AI.git
+    dest: /home/ubuntu/14-YG-AI
+    version: main
+    update: yes
+    force: no
+    accept_hostkey: yes
+  when: not (ansible_facts['discovered_interpreter_python'] is search('/home/ubuntu/14-YG-AI'))
+
+# - name: Pull latest release/v1.0.0 branch
+#   git:
+#     repo: https://github.com/100-hours-a-week/14-YG-AI.git
+#     dest: /home/ubuntu/14-YG-AI
+#     version: release/v1.0.0
+#     force: yes
+#     update: yes
+#     accept_hostkey: yes
+
+- name: Ensure .gitignore excludes local-only secret files
+  lineinfile:
+    path: /home/ubuntu/14-YG-AI/.gitignore
+    line: "{{ item }}"
+    regexp: "^{{ item | regex_escape() }}$"
+    state: present
+    create: yes
+  loop:
+    - ".env"
+    - "deft-observer-456807-c5-e9dda0532301.json"
+
+# --- Load AI environment variables before generating .env file ---
+- name: Load AI environment variables
+  include_vars:
+    file: "{{ playbook_dir }}/group_vars/ai_var.yml"
+
+# - name: Check if 'env' file exists
+#   stat:
+#     path: /home/ubuntu/14-YG-AI/env
+#   register: stat_env
+
+# - name: Rename 'env' to '.env' if exists
+#   command: mv env .env
+#   args:
+#     chdir: /home/ubuntu/14-YG-AI
+#   when: stat_env.stat.exists
+
+# - name: Backup .env and deft-observer-456807-c5-e9dda0532301.json if exist
+#   shell: |
+#     cp .env .env.bak 2>/release/v1.0.0/null || true
+#     cp deft-observer-456807-c5-e9dda0532301.json deft-observer-456807-c5-e9dda0532301.json.bak 2>/release/v1.0.0/null || true
+#   args:
+#     chdir: /home/ubuntu/14-YG-AI
+
+- name: Generate .env file from template
+  template:
+    src: .env.j2
+    dest: /home/ubuntu/14-YG-AI/.env
+    mode: "0644"
+
+- name: Generate GCP service account key file from template
+  template:
+    src: service-account.json.j2
+    dest: /home/ubuntu/14-YG-AI/deft-observer-456807-c5-e9dda0532301.json
+    mode: "0600"
+
+# 3.10 버전 오류나서 3.11 직접 설치
+- name: Ensure python3.11-venv is installed
+  apt:
+    name:
+      - python3.11
+      - python3.11-venv
+      - python3.11-distutils
+    state: present
+  become: true
+
+- name: Create Python virtual environment
+  shell: python3 -m venv .venv
+  args:
+    chdir: /home/ubuntu/14-YG-AI
+    creates: /home/ubuntu/14-YG-AI/.venv
+
+# --- inserted block: download and install pip manually if needed ---
+- name: Download get-pip.py
+  get_url:
+    url: https://bootstrap.pypa.io/get-pip.py
+    dest: /home/ubuntu/14-YG-AI/get-pip.py
+
+- name: Install pip in virtualenv via get-pip.py
+  command: /home/ubuntu/14-YG-AI/.venv/bin/python get-pip.py
+  args:
+    chdir: /home/ubuntu/14-YG-AI
+
+- name: Remove get-pip.py after installation
+  file:
+    path: /home/ubuntu/14-YG-AI/get-pip.py
+    state: absent
+
+- name: Install Python dependencies from requirements.txt
+  pip:
+    requirements: requirements.txt
+    executable: /home/ubuntu/14-YG-AI/.venv/bin/pip
+  args:
+    chdir: /home/ubuntu/14-YG-AI
+
+# 기존 uvicorn 프로세스 종료
+- name: Kill existing uvicorn process on port 8100 if exists
+  shell: |
+    PID=$(lsof -ti tcp:8100) && [ -n "$PID" ] && kill -9 $PID || true
+  ignore_errors: yes
+
+# fastapi 앱을 백그라운드에서 실행
+# - name: Run FastAPI app with uvicorn in background
+#   shell: |
+#     # source .venv/bin/activate
+#     nohup /home/ubuntu/14-YG-AI/.venv/bin/python -m uvicorn app:app \
+#       --host 0.0.0.0 --port 8100 \
+#       --log-level debug --access-log \
+#       >> /home/ubuntu/logs/ai_moongsan.log 2>&1 &
+#   args:
+#     chdir: /home/ubuntu/14-YG-AI
+#     executable: /bin/bash
+
+- name: Deploy FastAPI systemd service
+  template:
+    src: fastapi.service.j2
+    dest: /etc/systemd/system/fastapi.service
+  become: true
+
+- name: Reload systemd to recognize new service
+  systemd:
+    daemon_reload: yes
+  become: true
+
+- name: Enable and start FastAPI service
+  systemd:
+    name: fastapi
+    enabled: yes
+    state: started
+  become: true
+
+- name: Ensure ai log file is readable
+  file:
+    path: /home/ubuntu/logs/ai_moongsan.log
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+
+- name: Ensure logrotate config for aitest ai exists
+  copy:
+    dest: /etc/logrotate.d/ai_moongsan
+    content: |
+      /home/ubuntu/logs/ai_moongsan.log {
+          weekly
+          rotate 4
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0644 ubuntu ubuntu
+      }
+  become: true
