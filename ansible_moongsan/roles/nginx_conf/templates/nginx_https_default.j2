@@ -1,0 +1,63 @@
+server {
+    listen 80;
+    server_name {{ nginx_domain }}, www.{{ nginx_domain }};
+
+    return 301 https://{{ nginx_domain }}$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name {{ nginx_domain }};
+
+    ssl_certificate /etc/letsencrypt/live/{{ nginx_domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ nginx_domain }}/privkey.pem;
+
+    root /var/www/react;
+    index index.html;
+
+    client_max_body_size 10M;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # location /uploads/ {
+    #     alias /home/ubuntu/14-YG-BE/uploads/;
+    #     try_files $uri =404;
+    #     add_header Access-Control-Allow-Origin  *;
+    #     add_header Access-Control-Allow-Methods "GET, OPTIONS";
+    #     add_header Access-Control-Allow-Headers "*";
+    # }
+
+    location /api/ {
+        proxy_pass http://localhost:8080;
+        proxy_read_timeout 120;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # add_header Access-Control-Allow-Origin *;
+        add_header Access-Control-Allow-Methods "GET, POST, OPTIONS, PUT, DELETE, PATCH";
+        add_header Access-Control-Allow-Headers "*";
+    }
+
+    location /generation/ {
+        proxy_pass http://localhost:8100;
+        proxy_read_timeout 120;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /grafana/ {
+        proxy_pass http://localhost:3000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
