@@ -1,10 +1,13 @@
-ansible_moongsan/.DS_Store
-ansible_moongsan/tmp/.DS_Store
-terraform_gcp_moongsan/.terraform/*
-.terraform.lock.hcl
-terraform_gcp_moongsan/.DS_Store
-terraform_gcp_moongsan/terraform.tfstate
-terraform_gcp_moongsan/terraform.tfstate.backup
-ansible_moongsan/tmp/*
-ansible_moongsan/.vault_pass.txt
+# ansible
+ansible/.DS_Store
+ansible/tmp/.DS_Store
+ansible/tmp/*
+ansible/.vault_pass.txt
+
+# terraform
+terraform/.terraform/*
+terraform/.DS_Store
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+
 .DS_Store

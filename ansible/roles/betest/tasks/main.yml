@@ -1,0 +1,82 @@
+- name: Force update betest backend repository
+  shell: |
+    if [ -d /home/ubuntu/14-YG-BE ]; then
+      cd /home/ubuntu/14-YG-BE && git fetch origin && git checkout -B main origin/main
+    else
+      git clone -b main https://github.com/100-hours-a-week/14-YG-BE.git /home/ubuntu/14-YG-BE
+    fi
+  args:
+    executable: /bin/bash
+
+- name: Mark betest repo as safe for git
+  shell: git config --global --add safe.directory /home/ubuntu/14-YG-BE
+  become: false
+  args:
+    executable: /bin/bash
+
+- name: Load backend-specific variables
+  include_vars: "group_vars/{{ group_names[0] }}/be_var.yml"
+# --- docker로 전환
+- name: Ensure envs directory for backend exists
+  file:
+    path: "/home/ubuntu/envs/{{ group_names[0] }}"
+    state: directory
+    mode: "0755"
+    owner: ubuntu
+    group: ubuntu
+
+- name: Generate .env.prod file from template
+  template:
+    src: env.prod.j2
+    dest: "/home/ubuntu/envs/{{ group_names[0] }}/backend.env.prod"
+    mode: "0644"
+    owner: ubuntu
+    group: ubuntu
+
+- name: Compose up backend container
+  shell: docker compose -f docker/docker-compose.yml up -d --build backend
+  args:
+    chdir: /home/ubuntu/14-YG-CLOUD
+
+# - name: Build betest backend project
+#   shell: ./gradlew clean bootJar -x test
+#   args:
+#     chdir: /home/ubuntu/14-YG-BE
+
+# - name: Stop existing betest backend application
+#   shell: |
+#     pkill -f '14-YG-BE' || true
+#   ignore_errors: true
+
+# - name: Deploy Spring Boot backend systemd service
+#   template:
+#     src: spring_backend.service.j2
+#     dest: /etc/systemd/system/spring_backend.service
+#   become: true
+
+# - name: Reload systemd to recognize Spring Boot service
+#   systemd:
+#     daemon_reload: yes
+#   become: true
+
+# - name: Enable and start Spring Boot service
+#   systemd:
+#     name: spring_backend
+#     enabled: yes
+#     state: started
+#   become: true
+
+- name: Ensure logrotate config for betest backend exists
+  copy:
+    dest: /etc/logrotate.d/be_moongsan
+    content: |
+      /home/ubuntu/logs/be_moongsan.log {
+          weekly
+          rotate 4
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0644 ubuntu ubuntu
+      }
+  become: true
