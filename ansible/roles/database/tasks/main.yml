@@ -1,7 +1,7 @@
 - name: Convert MySQL root user to mysql_native_password
   shell: |
     mysql -u root <<EOF
-    ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '{{ db_root_password }}';
+    ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '{{ db.root_password }}';
     FLUSH PRIVILEGES;
     EOF
   become: true
@@ -15,24 +15,24 @@
 
 - name: Create database
   community.mysql.mysql_db:
-    name: "{{ db_name }}"
+    name: "{{ db.name }}"
     state: present
     encoding: utf8mb4
     collation: utf8mb4_general_ci
-    login_user: "{{ db_root_user }}"
-    login_password: "{{ db_root_password }}"
+    login_user: "{{ db.root_user }}"
+    login_password: "{{ db.root_password }}"
   vars:
     ansible_python_interpreter: /usr/bin/python3
 
 - name: Create database user and grant privileges
   community.mysql.mysql_user:
-    name: "{{ db_user }}"
-    password: "{{ db_password }}"
-    priv: "{{ db_name }}.*:ALL"
+    name: "{{ db.user }}"
+    password: "{{ db.password }}"
+    priv: "{{ db.name }}.*:ALL"
     host: localhost
     state: present
-    login_user: "{{ db_root_user }}"
-    login_password: "{{ db_root_password }}"
+    login_user: "{{ db.root_user }}"
+    login_password: "{{ db.root_password }}"
   vars:
     ansible_python_interpreter: /usr/bin/python3
 

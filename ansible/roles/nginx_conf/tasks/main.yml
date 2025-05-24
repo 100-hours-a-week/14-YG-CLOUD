@@ -16,7 +16,7 @@
     state: reloaded
 
 - name: Step 2 - Run certbot
-  command: certbot --nginx -d {{ nginx_domain }} --non-interactive --agree-tos -m {{ ssl_email }}
+  command: certbot --nginx -d {{ nginx.domain }} --non-interactive --agree-tos -m {{ nginx.ssl_email }}
 
 - name: Step 3 - Deploy final HTTPS nginx config
   template:

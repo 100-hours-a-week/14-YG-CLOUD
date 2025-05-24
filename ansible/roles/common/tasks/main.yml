@@ -1,30 +1,13 @@
-# NodeSource 저장소 추가
-# - name: Add NodeSource for Node.js 18
-#   shell: curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-#   args:
-#     executable: /bin/bash
-#   become: true
-
-# # Node.js 18 설치
-# - name: Install Node.js 18 (includes npm)
-#   apt:
-#     name: nodejs
-#     state: present
-#   become: true
-
 # apt 패키지 설치
 - name: Run apt update (once)
   apt:
     name:
       - nginx
-      - mysql-server
-      # - openjdk-21-jdk
-      - python3-pip
-      - git
-      - curl
       - certbot
       - python3-certbot-nginx
-      # - python3.11-venv
+      - mysql-client
+      - git
+      - curl
       - unzip
     state: present
     update_cache: yes
@@ -34,19 +17,21 @@
   until: result is succeeded
   become: true
 
-- name: Install Python packages
-  pip:
-    name:
-      - fastapi
-      - uvicorn
-    state: present
-    executable: pip3
+# docker 공식 스크립트로 설치
+- name: Install Docker using official script
+  shell: curl -fsSL https://get.docker.com | sh
+  args:
+    executable: /bin/bash
+  become: true
 
-# ansible에서 mysql 모듈을 사용하기 위한 PyMySQL 설치
-- name: Install PyMySQL for Ansible MySQL modules
-  pip:
-    name: PyMySQL
-    executable: pip3
+# logs 디렉토리 생성
+- name: Ensure logs directory exists
+  file:
+    path: /home/ubuntu/logs
+    state: directory
+    mode: "0755"
+    owner: ubuntu
+    group: ubuntu
 
 # 디스크 정리 작업 추가
 - name: Clean up APT cache and remove unused packages
@@ -74,16 +59,13 @@
   failed_when: false
   ignore_errors: yes
 
-- name: Install TypeScript globally
-  npm:
-    name: typescript
-    global: yes
+# Docker 데몬 & 권한 확인
+# •	ubuntu 유저를 docker 그룹에 포함시켜야 non-root 실행 가능
+# •	재부팅 없이 적용하려면 newgrp docker 또는 로그아웃/로그인 필요
+- name: Add ubuntu user to docker group
+  user:
+    name: ubuntu
+    groups: docker
+    append: yes
   become: true
-
-- name: Ensure logs directory exists
-  file:
-    path: /home/ubuntu/logs
-    state: directory
-    mode: "0755"
-    owner: ubuntu
-    group: ubuntu
+# 이후 newgrp docker 직접 실행하거나, 재부팅 후 적용

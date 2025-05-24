@@ -1,16 +1,16 @@
 server {
     listen 80;
-    server_name {{ nginx_domain }}, www.{{ nginx_domain }};
+    server_name {{ nginx.domain }}, www.{{ nginx.domain }};
 
-    return 301 https://{{ nginx_domain }}$request_uri;
+    return 301 https://{{ nginx.domain }}$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name {{ nginx_domain }};
+    server_name {{ nginx.domain }};
 
-    ssl_certificate /etc/letsencrypt/live/{{ nginx_domain }}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/{{ nginx_domain }}/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/{{ nginx.domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ nginx.domain }}/privkey.pem;
 
     root /var/www/react;
     index index.html;

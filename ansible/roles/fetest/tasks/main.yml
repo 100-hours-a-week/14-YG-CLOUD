@@ -42,15 +42,9 @@
   shell: rsync -av --delete /home/ubuntu/14-YG-FE/dist/ /var/www/react/
   become: true
 
-# - name: Health check for React frontend (via localhost)
-#   shell: curl -s https://{{ nginx_domain }} | grep -q '<div id="root">'
-#   register: frontend_health
-#   failed_when: frontend_health.rc != 0
-#   changed_when: false
-
 - name: Health check for React frontend (via localhost)
   uri:
-    url: "https://{{ nginx_domain }}"
+    url: "https://{{ nginx.domain }}"
     return_content: yes
     validate_certs: no
   register: frontend_health

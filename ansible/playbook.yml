@@ -19,4 +19,7 @@
   roles:
     - {role: common, tags: common} # 공통 패키지 설치 sudo apt update & install
     - {role: clone_cloud, tags: clone_cloud} # 클라우드 서버에서만 실행
+    - {role: nginx_conf, tags: nginx_conf} # nginx conf
+    - {role: database, tags: database} # db
+    - {role: db_backup, tags: db_backup} # db backup
     - {role: betest, tags: backend} # pr됐습니다~ -> 이거 실행 -> 배포되는지 확인
