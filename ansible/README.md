@@ -115,34 +115,55 @@ ansible-playbook -i inventory.ini playbook.yml --limit test --tags betest
 ansible-playbook -i inventory.ini playbook.yml --limit test --tags database
 ```
 
-## 🔧 역할별 상세 설명
+## 🔧 역할별 실행 흐름
 
-### common
-- 운영 서버의 공통 환경을 초기화합니다.
-- Docker 설치 (공식 스크립트 기반)
-- ubuntu 유저 docker 그룹 추가
-- nginx, certbot, mysql-client, git 등 설치
-- /logs, /tmp 디렉토리 보안 설정
-- APT 캐시 정리, 시스템 로그 정리
+Ansible 역할은 실제 배포 시나리오에 따라 순차적으로 실행됩니다.  
+각 역할은 독립적으로도 실행 가능하지만, 전체 흐름 안에서 다음과 같은 단계로 구성됩니다.
 
-### nginx_conf
-- Nginx 초기 설정 (http 템플릿 배포)
-- Certbot으로 인증서 발급
-- HTTPS 설정 템플릿 적용
-- Nginx reload
+---
 
-### betest
-- 백엔드 레포 클론 or fetch (14-YG-BE)
-- .env.prod 템플릿 생성
-- Docker Compose를 통한 컨테이너 빌드 및 실행
-- Logrotate 설정 (be_moongsan.log)
+### 🛠️ Step 1. 서버 환경 초기화
 
-### database
-- MySQL 설치
-- root 사용자 인증 방식 전환
-- DB 및 사용자 생성
-- MySQL 타임존 설정
+**📁 역할: `common`**
 
+- 운영 서버에 Docker, nginx, certbot, mysql-client 등을 설치합니다.
+- `ubuntu` 유저를 `docker` 그룹에 추가하여 sudo 없이 Docker 명령을 사용할 수 있도록 설정합니다.
+- `/home/ubuntu/logs`, `/tmp` 디렉토리를 생성하고 권한을 설정합니다.
+- APT 캐시 정리 및 시스템 로그(`journalctl`) 정리를 통해 초기 서버를 클린하게 유지합니다.
+
+---
+
+### 🧩 Step 2. Nginx 설정 및 HTTPS 적용
+
+**📁 역할: `nginx_conf`**
+
+- Nginx에 HTTP용 기본 설정 템플릿을 적용합니다.
+- certbot을 통해 SSL 인증서를 발급받습니다.
+- HTTPS 템플릿 설정을 적용하고, Nginx를 재시작하여 보안 통신을 적용합니다.
+
+---
+
+### 🧱 Step 3. 백엔드 애플리케이션 배포
+
+**📁 역할: `betest`**
+
+- 백엔드 레포지토리(`14-YG-BE`)를 clone 또는 fetch/reset 합니다.
+- `group_vars/test/all.yml`에서 주입되는 변수를 기반으로 `.env.prod` 파일을 생성합니다.
+- `docker/docker-compose.yml`에 정의된 컨테이너를 빌드하고 실행합니다.
+- 서비스 로그는 `/logs/be_moongsan.log`에 기록되며, logrotate 설정으로 관리됩니다.
+
+---
+
+### 🗄️ Step 4. 데이터베이스 초기화
+
+**📁 역할: `database`**
+
+- MySQL 서버를 설치합니다.
+- root 사용자 인증 방식을 `mysql_native_password`로 전환하여 Spring에서 접근 가능하게 합니다.
+- 지정된 이름의 데이터베이스 및 사용자 계정을 생성합니다.
+- 운영 체제와 DB의 타임존을 `Asia/Seoul`, `+09:00`으로 맞춰 서버 시간을 일치시킵니다.
+
+---
 
 ## 🌐 접근 URL
 
