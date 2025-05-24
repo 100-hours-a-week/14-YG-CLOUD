@@ -24,6 +24,21 @@
     executable: /bin/bash
   become: true
 
+# pip3 설치
+- name: Ensure pip3 is installed
+  apt:
+    name: python3-pip
+    state: present
+    update_cache: yes
+  become: true
+
+# ansible docker 모듈을 위한 pymysql 설치
+- name: Install PyMySQL for Ansible MySQL modules
+  pip:
+    name: PyMySQL
+    executable: pip3
+  become: true
+
 # logs 디렉토리 생성
 - name: Ensure logs directory exists
   file:

@@ -13,6 +13,7 @@
     # - {role: frontend, tags: frontend}
     - {role: fetest, tags: frontend} # pr됐습니다~ -> 이거 실행 -> 배포되는지 확인
     - {role: db_backup, tags: db_backup} # db backup
+
 - name: Setup test Server
   hosts: test
   become: yes
@@ -23,3 +24,5 @@
     - {role: database, tags: database} # db
     - {role: db_backup, tags: db_backup} # db backup
     - {role: betest, tags: backend} # pr됐습니다~ -> 이거 실행 -> 배포되는지 확인
+    - {role: aitest, tags: fastapi} # pr됐습니다~ -> 이거 실행 -> 배포되는지 확인
+    - {role: fetest, tags: frontend} # pr됐습니다~ -> 이거 실행 -> 배포되는지 확인

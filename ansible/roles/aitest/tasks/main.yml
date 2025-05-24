@@ -8,15 +8,6 @@
     accept_hostkey: yes
   when: not (ansible_facts['discovered_interpreter_python'] is search('/home/ubuntu/14-YG-AI'))
 
-# - name: Pull latest release/v1.0.0 branch
-#   git:
-#     repo: https://github.com/100-hours-a-week/14-YG-AI.git
-#     dest: /home/ubuntu/14-YG-AI
-#     version: release/v1.0.0
-#     force: yes
-#     update: yes
-#     accept_hostkey: yes
-
 - name: Ensure .gitignore excludes local-only secret files
   lineinfile:
     path: /home/ubuntu/14-YG-AI/.gitignore

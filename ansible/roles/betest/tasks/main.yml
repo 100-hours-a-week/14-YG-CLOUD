@@ -1,3 +1,4 @@
+# 깃허브 repo에서 be를 clone
 - name: Force update betest backend repository
   shell: |
     if [ -d /home/ubuntu/14-YG-BE ]; then
@@ -8,14 +9,13 @@
   args:
     executable: /bin/bash
 
+# betest 레포의 소유권을 ubuntu로 변경
 - name: Mark betest repo as safe for git
   shell: git config --global --add safe.directory /home/ubuntu/14-YG-BE
   become: false
   args:
     executable: /bin/bash
 
-- name: Load backend-specific variables
-  include_vars: "group_vars/{{ group_names[0] }}/be_var.yml"
 # --- docker로 전환
 - name: Ensure envs directory for backend exists
   file:
@@ -25,6 +25,7 @@
     owner: ubuntu
     group: ubuntu
 
+# 환경 변수 파일 생성
 - name: Generate .env.prod file from template
   template:
     src: env.prod.j2
@@ -33,44 +34,67 @@
     owner: ubuntu
     group: ubuntu
 
-- name: Compose up backend container
-  shell: docker compose -f docker/docker-compose.yml up -d --build backend
+# --- <운영으로 전환시 삭제>
+- name: Copy Dockerfile to BE repo for build
+  copy:
+    src: /home/ubuntu/14-YG-CLOUD/docker/backend/Dockerfile
+    dest: /home/ubuntu/14-YG-BE/Dockerfile
+    remote_src: true
+  become: true
+
+- name: Build Docker image for backend
+  shell: >
+    docker build -t {{ be.image }}:{{ be.tag }}
+    -f Dockerfile .
   args:
-    chdir: /home/ubuntu/14-YG-CLOUD
+    chdir: /home/ubuntu/14-YG-BE
+  become: true
 
-# - name: Build betest backend project
-#   shell: ./gradlew clean bootJar -x test
-#   args:
-#     chdir: /home/ubuntu/14-YG-BE
+- name: DockerHub 로그인
+  shell: echo "{{ dockerhub.password }}" | docker login --username {{ dockerhub.username }} --password-stdin
+  become: true
 
-# - name: Stop existing betest backend application
-#   shell: |
-#     pkill -f '14-YG-BE' || true
-#   ignore_errors: true
+- name: Push Docker image to registry
+  shell: docker push {{ be.image }}:{{ be.tag }}
+  become: true
+# --- </운영으로 전환시 삭제>
 
-# - name: Deploy Spring Boot backend systemd service
-#   template:
-#     src: spring_backend.service.j2
-#     dest: /etc/systemd/system/spring_backend.service
-#   become: true
+- name: Pull image from registry (post-push validation)
+  shell: docker pull {{ be.image }}:{{ be.tag }}
+  become: true
 
-# - name: Reload systemd to recognize Spring Boot service
-#   systemd:
-#     daemon_reload: yes
-#   become: true
+- name: Ensure backend container is absent before redeployment
+  community.docker.docker_container:
+    name: "{{ be.container_name }}"
+    state: absent
 
-# - name: Enable and start Spring Boot service
-#   systemd:
-#     name: spring_backend
-#     enabled: yes
-#     state: started
-#   become: true
+- name: Ensure logs directory exists
+  file:
+    path: "{{ be.log_path }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
 
+- name: Run backend container
+  community.docker.docker_container:
+    name: "{{ be.container_name }}"
+    image: "{{ be.image }}:{{ be.tag }}"
+    state: started
+    recreate: true # always recreate for fresh image
+    restart_policy: unless-stopped
+    env_file: "/home/ubuntu/envs/test/backend.env.prod"
+    published_ports:
+      - "{{ be.port }}:8080"
+    volumes:
+      - "{{ be.log_path }}:{{ be.log_path }}"
+
+# logrotate 설정
 - name: Ensure logrotate config for betest backend exists
   copy:
     dest: /etc/logrotate.d/be_moongsan
     content: |
-      /home/ubuntu/logs/be_moongsan.log {
+      {{ be.log_path }}/logs/be_moongsan.log {
           weekly
           rotate 4
           compress

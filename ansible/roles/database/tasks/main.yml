@@ -1,16 +1,21 @@
-- name: Convert MySQL root user to mysql_native_password
-  shell: |
-    mysql -u root <<EOF
-    ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '{{ db.root_password }}';
-    FLUSH PRIVILEGES;
-    EOF
-  become: true
-
 - name: Ensure MySQL server is installed (fail-safe)
   apt:
     name: mysql-server
     state: present
     update_cache: yes
+  become: true
+
+- name: Restart MySQL
+  service:
+    name: mysql
+    state: restarted
+
+- name: Convert MySQL root user to mysql_native_password
+  shell: |
+    mysql -u root -p'{{ db.root_password }}' <<EOF
+    ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '{{ db.root_password }}';
+    FLUSH PRIVILEGES;
+    EOF
   become: true
 
 - name: Create database
@@ -36,6 +41,18 @@
   vars:
     ansible_python_interpreter: /usr/bin/python3
 
+- name: Grant DB access to moongsan_admin from Docker host
+  community.mysql.mysql_user:
+    name: "{{ db.user }}"
+    host: "172.17.0.%"
+    password: "{{ db.password }}"
+    priv: "{{ db.name }}.*:ALL"
+    state: present
+    login_user: "{{ db.root_user }}"
+    login_password: "{{ db.root_password }}"
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
 - name: Set system timezone to Asia/Seoul
   command: timedatectl set-timezone Asia/Seoul
   when: ansible_date_time.tz != "KST"
@@ -47,7 +64,15 @@
     line: 'default-time-zone = "+09:00"'
     insertafter: "[mysqld]"
 
-- name: Restart MySQL
-  service:
-    name: mysql
-    state: restarted
+- name: Set MySQL bind-address to 0.0.0.0
+  lineinfile:
+    path: /etc/mysql/mysql.conf.d/mysqld.cnf
+    regexp: "^bind-address"
+    line: "bind-address = 0.0.0.0"
+    insertafter: "[mysqld]"
+  notify: Restart MySQL
+  become: true
+# - name: Restart MySQL
+#   service:
+#     name: mysql
+#     state: restarted
