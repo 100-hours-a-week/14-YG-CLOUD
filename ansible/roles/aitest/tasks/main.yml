@@ -1,3 +1,8 @@
+- name: Check if AI repo already exists
+  stat:
+    path: /home/ubuntu/14-YG-AI
+  register: ai_repo_stat
+
 - name: Clone AI repo if not present
   git:
     repo: https://github.com/100-hours-a-week/14-YG-AI.git
@@ -6,7 +11,43 @@
     update: yes
     force: no
     accept_hostkey: yes
-  when: not (ansible_facts['discovered_interpreter_python'] is search('/home/ubuntu/14-YG-AI'))
+  when: not ai_repo_stat.stat.exists
+
+# ansible/roles/aitest/tasks/patch_requirements.yml
+# --- requirements.txt 수정 이유 ---
+# AI 서비스가 정상적으로 실행되기 위해 일부 필수 라이브러리 버전 고정이 필요함.
+# 1. PyYAML: langgraph 프레임워크에서 내부적으로 사용하는 YAML 파싱 의존성
+# 2. torch==2.3.0: easyocr에서 사용하는 딥러닝 백엔드와의 호환성을 위해 필요
+# 3. opencv-python-headless==4.9.0.80: easyocr와의 충돌 방지 및 안정적인 이미지 처리용
+# 4. pytest-mock==3.14.0: 테스트 환경에서 버전 미정으로 인한 충돌 방지를 위해 고정
+# 해당 수정은 테스트 및 운영환경 일관성 유지를 위한 임시 조치이며, 추후 레포 자체 수정 예정
+- name: Ensure PyYAML is present with version
+  lineinfile:
+    path: /home/ubuntu/14-YG-AI/requirements.txt
+    regexp: "^PyYAML"
+    line: "PyYAML>=6.0"
+    insertafter: EOF
+    create: yes
+
+- name: Ensure torch==2.3.0 is present
+  lineinfile:
+    path: /home/ubuntu/14-YG-AI/requirements.txt
+    regexp: "^torch"
+    line: "torch==2.3.0"
+    insertafter: EOF
+
+- name: Ensure opencv-python-headless==4.9.0.80 is present
+  lineinfile:
+    path: /home/ubuntu/14-YG-AI/requirements.txt
+    regexp: "^opencv-python-headless"
+    line: "opencv-python-headless==4.9.0.80"
+    insertafter: EOF
+
+- name: Set pytest-mock to specific version
+  lineinfile:
+    path: /home/ubuntu/14-YG-AI/requirements.txt
+    regexp: "^pytest-mock"
+    line: "pytest-mock==3.14.0"
 
 # - name: Ensure .gitignore excludes local-only secret files
 #   lineinfile:
@@ -20,10 +61,7 @@
 #     - "deft-observer-456807-c5-e9dda0532301.json"
 
 # --- Load AI environment variables before generating .env file ---
-- name: Load AI environment variables
-  include_vars:
-    file: "ai_var.yml"
-    dir: "{{ inventory_dir }}/../group_vars/{{ group_names[0] }}"
+
 # - name: Check if 'env' file exists
 #   stat:
 #     path: /home/ubuntu/14-YG-AI/env
@@ -61,6 +99,12 @@
     dest: /home/ubuntu/14-YG-AI/Dockerfile
     remote_src: true
   become: true
+
+# uvicorn이 pip --user 경로인 /root/.local/bin에 설치되었기 때문에,
+# bash 실행 시 해당 경로가 PATH에 반영되지 않아 uvicorn 명령어를 인식하지 못함.
+# 따라서 ENTRYPOINT에서 uvicorn의 전체 경로(/root/.local/bin/uvicorn)를 명시적으로 사용함.
+# 이 수정은 Docker 컨테이너의 환경 일관성 확보를 위한 임시 조치이며,
+# 추후 시스템 전체에 설치(pip install -r requirements.txt without --user)하는 방식으로 전환 가능.
 
 # Docker build
 - name: Build Docker image for AI
