@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y gcc && rm -rf /var/lib/apt/lists/*
 
 # requirements 복사 및 설치
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install --user -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # 앱 코드 복사
 COPY . .
@@ -23,6 +23,9 @@ WORKDIR /app
 # 로깅 경로 생성 및 권한 설정
 RUN mkdir -p /var/log/moongsan && chown -R 1000:1000 /var/log/moongsan
 
+# 유저 변경 (선택적)
+USER 1000
+
 # requirements 복사 및 설치
 COPY --from=builder /root/.local /root/.local
 ENV PATH=/root/.local/bin:$PATH
@@ -31,4 +34,4 @@ ENV PATH=/root/.local/bin:$PATH
 COPY . .
 
 # ENTRYPOINT로 로그 출력
-ENTRYPOINT ["bash", "-c", "/root/.local/bin/uvicorn app:app --host 0.0.0.0 --port 8100 --log-level debug --access-log | tee -a /var/log/moongsan/ai_moongsan.log"]
+ENTRYPOINT ["bash", "-c", "uvicorn app:app --host 0.0.0.0 --port 8100 --log-level debug --access-log | tee -a /var/log/moongsan/ai_moongsan.log"]
