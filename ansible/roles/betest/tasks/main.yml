@@ -70,7 +70,7 @@
 
 - name: Ensure logs directory exists
   file:
-    path: "{{ be.log_path }}"
+    path: "{{ log_path }}"
     state: directory
     owner: ubuntu
     group: ubuntu
@@ -87,14 +87,14 @@
     published_ports:
       - "{{ be.port }}:8080"
     volumes:
-      - "{{ be.log_path }}:{{ be.log_path }}"
+      - "{{ log_path }}:{{ log_path }}"
 
 # logrotate 설정
 - name: Ensure logrotate config for betest backend exists
   copy:
     dest: /etc/logrotate.d/be_moongsan
     content: |
-      {{ be.log_path }}/logs/be_moongsan.log {
+      {{ log_path }}/logs/be_moongsan.log {
           weekly
           rotate 4
           compress

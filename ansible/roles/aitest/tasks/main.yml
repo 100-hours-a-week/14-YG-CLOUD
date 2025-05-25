@@ -8,16 +8,16 @@
     accept_hostkey: yes
   when: not (ansible_facts['discovered_interpreter_python'] is search('/home/ubuntu/14-YG-AI'))
 
-- name: Ensure .gitignore excludes local-only secret files
-  lineinfile:
-    path: /home/ubuntu/14-YG-AI/.gitignore
-    line: "{{ item }}"
-    regexp: "^{{ item | regex_escape() }}$"
-    state: present
-    create: yes
-  loop:
-    - ".env"
-    - "deft-observer-456807-c5-e9dda0532301.json"
+# - name: Ensure .gitignore excludes local-only secret files
+#   lineinfile:
+#     path: /home/ubuntu/14-YG-AI/.gitignore
+#     line: "{{ item }}"
+#     regexp: "^{{ item | regex_escape() }}$"
+#     state: present
+#     create: yes
+#   loop:
+#     - ".env"
+#     - "deft-observer-456807-c5-e9dda0532301.json"
 
 # --- Load AI environment variables before generating .env file ---
 - name: Load AI environment variables
@@ -42,6 +42,7 @@
 #   args:
 #     chdir: /home/ubuntu/14-YG-AI
 
+# 환경 변수 + GCP 서비스 계정 키 파일을 템플릿에서 생성
 - name: Generate .env file from template
   template:
     src: .env.j2
@@ -54,50 +55,95 @@
     dest: /home/ubuntu/14-YG-AI/deft-observer-456807-c5-e9dda0532301.json
     mode: "0600"
 
-# 3.10 버전 오류나서 3.11 직접 설치
-- name: Ensure python3.11-venv is installed
-  apt:
-    name:
-      - python3.11
-      - python3.11-venv
-      - python3.11-distutils
-    state: present
+- name: Copy Dockerfile to AI repo
+  copy:
+    src: /home/ubuntu/14-YG-CLOUD/docker/ai/Dockerfile
+    dest: /home/ubuntu/14-YG-AI/Dockerfile
+    remote_src: true
   become: true
 
-- name: Create Python virtual environment
-  shell: python3 -m venv .venv
+# Docker build
+- name: Build Docker image for AI
+  shell: >
+    docker build -t {{ ai.image }}:{{ ai.tag }}
+    -f Dockerfile .
   args:
     chdir: /home/ubuntu/14-YG-AI
-    creates: /home/ubuntu/14-YG-AI/.venv
+  become: true
+
+# DockerHub 로그인
+- name: DockerHub 로그인
+  shell: echo "{{ dockerhub.password }}" | docker login --username {{ dockerhub.username }} --password-stdin
+  become: true
+
+# Docker 이미지 푸시
+- name: Push Docker image to registry
+  shell: docker push {{ ai.image }}:{{ ai.tag }}
+  become: true
+
+# Docker 이미지 풀 (푸시 후 검증)
+- name: Pull AI image from registry
+  shell: docker pull {{ ai.image }}:{{ ai.tag }}
+  become: true
+
+# Docker run
+- name: Run AI container
+  community.docker.docker_container:
+    name: "{{ ai.container_name }}"
+    image: "{{ ai.image }}:{{ ai.tag }}"
+    state: started
+    restart_policy: unless-stopped
+    recreate: true
+    env_file: "/home/ubuntu/14-YG-AI/.env"
+    published_ports:
+      - "{{ ai.port }}:8100"
+    volumes:
+      - "{{ log_path }}:{{ log_path }}"
+
+# # 3.10 버전 오류나서 3.11 직접 설치
+# - name: Ensure python3.11-venv is installed
+#   apt:
+#     name:
+#       - python3.11
+#       - python3.11-venv
+#       - python3.11-distutils
+#     state: present
+#   become: true
+
+# - name: Create Python virtual environment
+#   shell: python3 -m venv .venv
+#   args:
+#     chdir: /home/ubuntu/14-YG-AI
+#     creates: /home/ubuntu/14-YG-AI/.venv
 
 # --- inserted block: download and install pip manually if needed ---
-- name: Download get-pip.py
-  get_url:
-    url: https://bootstrap.pypa.io/get-pip.py
-    dest: /home/ubuntu/14-YG-AI/get-pip.py
+# - name: Download get-pip.py
+#   get_url:
+#     url: https://bootstrap.pypa.io/get-pip.py
+#     dest: /home/ubuntu/14-YG-AI/get-pip.py
 
-- name: Install pip in virtualenv via get-pip.py
-  command: /home/ubuntu/14-YG-AI/.venv/bin/python get-pip.py
-  args:
-    chdir: /home/ubuntu/14-YG-AI
+# - name: Install pip in virtualenv via get-pip.py
+#   command: /home/ubuntu/14-YG-AI/.venv/bin/python get-pip.py
+#   args:
+#     chdir: /home/ubuntu/14-YG-AI
 
-- name: Remove get-pip.py after installation
-  file:
-    path: /home/ubuntu/14-YG-AI/get-pip.py
-    state: absent
+# - name: Remove get-pip.py after installation
+#   file:
+#     path: /home/ubuntu/14-YG-AI/get-pip.py
+#     state: absent
 
-- name: Install Python dependencies from requirements.txt
-  pip:
-    requirements: requirements.txt
-    executable: /home/ubuntu/14-YG-AI/.venv/bin/pip
-  args:
-    chdir: /home/ubuntu/14-YG-AI
+# - name: Install Python dependencies from requirements.txt
+#   pip:
+#     requirements: requirements.txt
+#     executable: /home/ubuntu/14-YG-AI/.venv/bin/pip
+#   args:
+#     chdir: /home/ubuntu/14-YG-AI
 
 # 기존 uvicorn 프로세스 종료
-- name: Kill existing uvicorn process on port 8100 if exists
-  shell: |
-    PID=$(lsof -ti tcp:8100) && [ -n "$PID" ] && kill -9 $PID || true
-  ignore_errors: yes
+# - name: Kill existing uvicorn process on port 8100 if exists
+#   shell: |
+#     PID=$(lsof -ti tcp:8100) && [ -n "$PID" ] && kill -9 $PID || true
+#   ignore_errors: yes
 
 # fastapi 앱을 백그라운드에서 실행
 # - name: Run FastAPI app with uvicorn in background
@@ -111,27 +157,27 @@
 #     chdir: /home/ubuntu/14-YG-AI
 #     executable: /bin/bash
 
-- name: Deploy FastAPI systemd service
-  template:
-    src: fastapi.service.j2
-    dest: /etc/systemd/system/fastapi.service
-  become: true
+# - name: Deploy FastAPI systemd service
+#   template:
+#     src: fastapi.service.j2
+#     dest: /etc/systemd/system/fastapi.service
+#   become: true
 
-- name: Reload systemd to recognize new service
-  systemd:
-    daemon_reload: yes
-  become: true
+# - name: Reload systemd to recognize new service
+#   systemd:
+#     daemon_reload: yes
+#   become: true
 
-- name: Enable and start FastAPI service
-  systemd:
-    name: fastapi
-    enabled: yes
-    state: started
-  become: true
+# - name: Enable and start FastAPI service
+#   systemd:
+#     name: fastapi
+#     enabled: yes
+#     state: started
+#   become: true
 
 - name: Ensure ai log file is readable
   file:
-    path: /home/ubuntu/logs/ai_moongsan.log
+    path: "{{ log_path }}/ai_moongsan.log"
     owner: ubuntu
     group: ubuntu
     mode: "0644"
@@ -140,7 +186,7 @@
   copy:
     dest: /etc/logrotate.d/ai_moongsan
     content: |
-      /home/ubuntu/logs/ai_moongsan.log {
+      {{ log_path }}/ai_moongsan.log {
           weekly
           rotate 4
           compress
