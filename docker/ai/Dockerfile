@@ -32,4 +32,4 @@ ENV PATH=/root/.local/bin:$PATH
 COPY . .
 
 # 로그를 tee로 파일에 저장하며 동시에 콘솔 출력
-ENTRYPOINT ["bash", "-c", "uvicorn app:app --host 0.0.0.0 --port 8100 --log-level debug --access-log | tee -a /var/log/moongsan/ai_moongsan.log"]
+ENTRYPOINT ["bash", "-c", "/root/.local/bin/uvicorn app:app --host 0.0.0.0 --port 8100 --log-level debug --access-log | tee -a /var/log/moongsan/ai_moongsan.log"]
