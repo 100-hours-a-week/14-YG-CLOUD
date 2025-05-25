@@ -23,9 +23,6 @@ WORKDIR /app
 # 로깅 경로 생성 및 권한 설정
 RUN mkdir -p /var/log/moongsan && chown -R 1000:1000 /var/log/moongsan
 
-# 유저 변경 (선택적)
-USER 1000
-
 # requirements 복사 및 설치
 COPY --from=builder /root/.local /root/.local
 ENV PATH=/root/.local/bin:$PATH
