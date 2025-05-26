@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y gcc && rm -rf /var/lib/apt/lists/*
 
 # requirements 복사 및 설치
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install --user -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # 앱 소스 복사
 COPY . .
