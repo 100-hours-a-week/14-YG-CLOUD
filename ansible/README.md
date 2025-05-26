@@ -79,7 +79,7 @@ vault_password_file = .vault_pass.txt
 ```bash
 ansible-playbook -i inventory.ini playbook.yml \
   --limit prod --tags fastapi \
-  --extra-vars "ai_tag=v1.0.0" --check
+  --extra-vars "tag=v1.0.0" --check
 ```
 > 운영 환경에서는 항상 환경 확인 + 태그 명시 + 재확인 + dry-run 후 배포를 습관화하세요.
 
@@ -98,19 +98,19 @@ test.moongsan.com ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/lsh-st
 ### 2. 태그 전략 및 배포 방식
 
 Docker 이미지 태그는 v1.*.* 형식을 기준으로 하며, 브랜치/배포 목적에 따라 다음과 같이 지정합니다.
-Ansible에서는 --extra-vars "ai_tag=..." 방식으로 태그를 명시해야 정확한 이미지가 배포됩니다.
+Ansible에서는 --extra-vars "tag=..." 방식으로 태그를 명시해야 정확한 이미지가 배포됩니다.
 ```bash
 # release 브랜치 (QA 서버용, 릴리즈 후보)
 ansible-playbook -i inventory.ini playbook.yml \
   --limit test --tags fastapi \
-  --extra-vars "ai_tag=rc-1.0.0"
+  --extra-vars "tag=rc-1.0.0"
 
 # main 브랜치 (운영 서버용, 안정 버전)
 ansible-playbook -i inventory.ini playbook.yml \
   --limit prod --tags fastapi \
-  --extra-vars "ai_tag=v1.0.0"
+  --extra-vars "tag=v1.0.0"
 ```
->💡 ai_tag는 group_vars/[env]/all.yml에서 기본값을 지정할 수 있지만,
+>💡 tag는 group_vars/[env]/all.yml에서 기본값을 지정할 수 있지만,
 운영 환경에서는 반드시 명시적으로 --extra-vars를 통해 태그를 지정하는 것을 권장합니다
 
 ---
@@ -166,7 +166,7 @@ ansible-playbook -i inventory.ini playbook.yml --limit test --tags common
 ansible-playbook -i inventory.ini playbook.yml --limit test --tags nginx_conf
 
 # 백엔드 배포
-ansible-playbook -i inventory.ini playbook.yml --limit test --tags betest --extra-vars "be_tag=rc-1.0.0"
+ansible-playbook -i inventory.ini playbook.yml --limit test --tags betest --extra-vars "tag=test-1.0.0"
 
 # DB 설치 및 초기 설정
 ansible-playbook -i inventory.ini playbook.yml --limit test --tags database
