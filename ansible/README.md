@@ -222,9 +222,35 @@ Ansible 역할은 실제 배포 시나리오에 따라 순차적으로 실행됩
 - 디스크 공간 확보를 위해 빌드 전마다 사용하지 않는 Docker 이미지 및 빌드 캐시를 정리합니다.
   - `docker image prune -f`
   - `docker builder prune -f`
+
 ---
 
+### 🧠 Step 5. AI 서비스 패키지 버전 고정 (임시 수정 내역)
 
+**📁 역할: `aitest`**
+
+- FastAPI 기반 AI 애플리케이션을 `/home/ubuntu/14-YG-AI`에 배치합니다.
+- .env 및 GCP 인증 키 파일을 템플릿으로 자동 생성합니다.
+- 멀티 스테이지 Dockerfile을 활용해 이미지 빌드 및 실행을 자동화하며, 최적화된 대형 패키지를 포함합니다.
+- /generation/description에서 상품 상세 설명을 생성하며, 로그는 /var/log/moongsan/ai_moongsan.log에 기록됩니다.
+- 배포 후 불필요한 이미지/캐시는 자동 정리됩니다.
+
+---
+
+### 🧾 Step 6. 프론트엔드 애플리케이션 배포
+
+**📁 역할: `fetest`**
+
+- 프론트엔드 레포지토리(`14-YG-FE`)를 clone 또는 fetch/reset 합니다.
+- `.env` 파일을 템플릿(`vite.env.j2`)으로 생성하여 `VITE_BASE_URL`을 환경에 맞게 자동 주입합니다.
+- `vite.config.ts` 파일 역시 환경에 맞는 proxy 설정을 주입하여 개발 모드에서 API를 연결할 수 있게 합니다.
+- `npm install`, `npm run build`로 정적 빌드 후, `/var/www/react`로 결과물을 복사하여 nginx가 서빙합니다.
+- 로그는 `/logs/fe_moongsan.log`에 기록되며, logrotate 설정으로 관리됩니다.
+- 디스크 공간 확보를 위해 불필요한 node_modules 캐시 및 Docker 빌드 캐시가 정리됩니다.
+  - `rm -rf node_modules/`
+  - `npm cache clean --force`
+
+---
 
 ## 🌐 접근 URL
 
@@ -232,7 +258,7 @@ Ansible 역할은 실제 배포 시나리오에 따라 순차적으로 실행됩
 |---------------|-----------------------------|
 | Frontend      | https://moongsan.com        |
 | Backend API   | https://moongsan.com/api    |
-| AI API        | http://localhost:8100       |
+| AI API        | https://moongsan.com/generation      |
 | Grafana       | https://grafana.moongsan.com |
 
 ## ⚙️ 기타 관리 방법
