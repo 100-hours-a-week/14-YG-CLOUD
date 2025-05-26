@@ -49,6 +49,13 @@
     regexp: "^pytest-mock"
     line: "pytest-mock==3.14.0"
 
+- name: Ensure uvicorn is present
+  lineinfile:
+    path: /home/ubuntu/14-YG-AI/requirements.txt
+    regexp: "^uvicorn"
+    line: "uvicorn[standard]"
+    insertafter: EOF
+
 # - name: Ensure .gitignore excludes local-only secret files
 #   lineinfile:
 #     path: /home/ubuntu/14-YG-AI/.gitignore

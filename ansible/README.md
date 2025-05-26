@@ -71,6 +71,17 @@ vault_password_file = .vault_pass.txt
 
 
 ## 🚀 사용 방법
+### ⚠️ 운영 환경 배포 시 주의사항
+
+운영 서버(--limit prod)에 --tags fastapi, --tags backend 등을 사용해 직접 배포하는 경우, 다음 사항을 반드시 확인해야 합니다:
+#### dry-run(dry 실행) 습관화
+실행 전 영향 범위를 확인하려면 --check 플래그를 활용하세요:
+```bash
+ansible-playbook -i inventory.ini playbook.yml \
+  --limit prod --tags fastapi \
+  --extra-vars "ai_tag=v1.0.0" --check
+```
+> 운영 환경에서는 항상 환경 확인 + 태그 명시 + 재확인 + dry-run 후 배포를 습관화하세요.
 
 ### 1. 인벤토리 설정
 
@@ -100,21 +111,7 @@ ansible-playbook -i inventory.ini playbook.yml \
   --extra-vars "ai_tag=v1.0.0"
 ```
 >💡 ai_tag는 group_vars/[env]/all.yml에서 기본값을 지정할 수 있지만,
-운영 환경에서는 반드시 명시적으로 --extra-vars를 통해 태그를 지정하는 것을 권장합니다.
-
----
-
-### 3. Ansible에서 사용하는 태그 변수
-
-Ansible에서는 `group_vars/[env]/all.yml`의 `be.tag`, `ai.tag` 변수를 통해 이미지 태그를 지정합니다.
-
-```yaml
-# 예시
-dockerhub:
-  tag: "dev"   # dev 브랜치에서는 dev, main 브랜치에서는 latest 또는 prod-20240526 등으로 수동 변경
-```
-
-실제 배포 전 태그를 적절히 지정하지 않으면 이전 이미지가 pull되는 문제가 발생할 수 있습니다.
+운영 환경에서는 반드시 명시적으로 --extra-vars를 통해 태그를 지정하는 것을 권장합니다
 
 ---
 
@@ -169,7 +166,7 @@ ansible-playbook -i inventory.ini playbook.yml --limit test --tags common
 ansible-playbook -i inventory.ini playbook.yml --limit test --tags nginx_conf
 
 # 백엔드 배포
-ansible-playbook -i inventory.ini playbook.yml --limit test --tags betest
+ansible-playbook -i inventory.ini playbook.yml --limit test --tags betest --extra-vars "be_tag=rc-1.0.0"
 
 # DB 설치 및 초기 설정
 ansible-playbook -i inventory.ini playbook.yml --limit test --tags database
