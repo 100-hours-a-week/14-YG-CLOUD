@@ -98,6 +98,10 @@
     volumes:
       - "{{ log_path }}:{{ log_path }}"
 
+- name: Remove dangling images after deployment
+  shell: docker image prune -f
+  become: true
+
 # logrotate 설정
 - name: Ensure logrotate config for betest backend exists
   copy:

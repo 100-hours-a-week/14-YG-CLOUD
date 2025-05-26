@@ -235,6 +235,10 @@
 #     state: started
 #   become: true
 
+- name: Remove dangling images after deployment
+  shell: docker image prune -f
+  become: true
+
 - name: Ensure ai log file is readable
   file:
     path: "{{ log_path }}/ai_moongsan.log"
