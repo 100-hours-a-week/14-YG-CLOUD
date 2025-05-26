@@ -1,0 +1,10 @@
+blank_issues_enabled: true
+
+issue_templates:
+  - name: Cloud Sprint Backlog template
+    description: Sprint 백로그 작성용 템플릿
+    file: cloud-sprint-backlog-template.md
+
+  - name: Cloud SubTask template
+    description: 서브 태스크 작성용 템플릿
+    file: cloud-subtask-template.md
