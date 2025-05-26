@@ -26,8 +26,8 @@ COPY requirements.txt .
 RUN mkdir -p /var/log/moongsan && chown -R 1000:1000 /var/log/moongsan
 
 # 필요 경로 복사 및 PATH 설정
-# COPY --from=builder /root/.local /root/.local
-# RUN chmod -R +x /root/.local
+COPY --from=builder /root/.local /root/.local
+RUN chmod -R +x /root/.local
 
 # ENV PATH=/root/.local/bin:$PATH
 
