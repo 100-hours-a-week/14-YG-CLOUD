@@ -1,5 +1,5 @@
 # 1단계: 빌드 이미지
-FROM python:3.11-slim AS builder
+FROM python:3.11 AS builder
 
 WORKDIR /app
 
@@ -8,21 +8,26 @@ RUN apt-get update && apt-get install -y gcc && rm -rf /var/lib/apt/lists/*
 
 # requirements 복사 및 설치
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && \ 
+    pip install --no-cache-dir -r requirements.txt && \
+    pip cache purge
 
 # 앱 소스 복사
 COPY . .
 
 # 2단계: 실행 이미지
-FROM python:3.11-slim
+FROM python:3.11
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y gcc && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y gcc && \ 
+    rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip cache purge
 
 COPY . .
 
