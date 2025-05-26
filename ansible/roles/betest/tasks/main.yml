@@ -34,6 +34,14 @@
     owner: ubuntu
     group: ubuntu
 
+- name: Ensure CORS allows dev/test domains
+  lineinfile:
+    path: /home/ubuntu/14-YG-BE/src/main/java/com/moogsan/moongsan_backend/global/config/SecurityConfig.java
+    insertafter: '^\s*config\.setAllowedOrigins\(List\.of\($'
+    line: '                "https://{{ nginx.domain }}",'
+    state: present
+  become: true
+
 # build 전 캐시/이미지 정리
 - name: Prune unused Docker images (dangling only)
   shell: docker image prune -f

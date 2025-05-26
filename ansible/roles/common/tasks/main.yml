@@ -16,6 +16,21 @@
   register: result
   until: result is succeeded
   become: true
+  tags: apt_update
+
+- name: Add NodeSource Node.js 18.x repo
+  shell: curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+  args:
+    executable: /bin/bash
+  become: true
+  tags: nodejs_setup
+
+- name: Install Node.js 18.x
+  apt:
+    name: nodejs
+    state: present
+  become: true
+  tags: nodejs_install
 
 # docker 공식 스크립트로 설치
 - name: Install Docker using official script

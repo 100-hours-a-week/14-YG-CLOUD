@@ -14,97 +14,56 @@
     group: ubuntu
   become: true
 
-# 0. Dockerfile 복사
-- name: Copy Dockerfile to FE repo
-  copy:
-    src: /home/ubuntu/14-YG-CLOUD/docker/frontend/Dockerfile
-    dest: /home/ubuntu/14-YG-FE/Dockerfile
-    remote_src: true
+- name: Generate vite.config.ts from template
+  template:
+    src: vite.config.ts.j2
+    dest: /home/ubuntu/14-YG-FE/vite.config.ts
+    mode: "0644"
+  become: true
 
-# 1. Docker 빌드
-- name: Build frontend Docker image
-  shell: >
-    docker build -t {{ fe.image }}:{{ fe.tag }}
-    -f Dockerfile .
+- name: Generate .env file for Vite
+  template:
+    src: vite.env.j2
+    dest: /home/ubuntu/14-YG-FE/.env
+    mode: "0644"
+  become: true
+
+- name: Install frontend dependencies
+  npm:
+    path: /home/ubuntu/14-YG-FE
+    state: present
+  become: false
+
+- name: Build frontend project
+  shell: npm run build
   args:
     chdir: /home/ubuntu/14-YG-FE
+  register: fe_build_result
+  failed_when: fe_build_result.rc != 0
+  become: false
+
+- name: Write build log manually
+  copy:
+    dest: /home/ubuntu/logs/fe_moongsan.log
+    content: |
+      ===== STDOUT =====
+      {{ fe_build_result.stdout }}
+      ===== STDERR =====
+      {{ fe_build_result.stderr }}
   become: true
 
-# 2. DockerHub 로그인
-- name: DockerHub 로그인
-  shell: echo "{{ dockerhub.password }}" | docker login --username {{ dockerhub.username }} --password-stdin
+- name: Deploy built frontend to nginx
+  shell: rsync -av --delete /home/ubuntu/14-YG-FE/dist/ /var/www/react/
   become: true
 
-# 3. Docker push
-- name: Push frontend Docker image to registry
-  shell: docker push {{ fe.image }}:{{ fe.tag }}
-  become: true
-
-# 4. Docker pull (검증용)
-- name: Pull image for validation
-  shell: docker pull {{ fe.image }}:{{ fe.tag }}
-  become: true
-
-# 5. 기존 컨테이너 제거
-- name: Ensure frontend container is absent before redeployment
-  community.docker.docker_container:
-    name: "{{ fe.container_name }}"
-    state: absent
-
-# 6. 컨테이너 실행
-- name: Run frontend container
-  community.docker.docker_container:
-    name: "{{ fe.container_name }}"
-    image: "{{ fe.image }}:{{ fe.tag }}"
-    state: started
-    recreate: true
-    restart_policy: unless-stopped
-    published_ports:
-      - "{{ fe.port }}:80"
-    volumes:
-      - "{{ log_path }}:{{ log_path }}"
-
-# 7. 불필요 이미지 정리
-- name: Remove dangling images
-  shell: docker image prune -f
-  become: true
-
-# - name: Install frontend dependencies
-#   npm:
-#     path: /home/ubuntu/14-YG-FE
-#     state: present
-#   become: false
-
-# - name: Build frontend project
-#   shell: npm run build
-#   args:
-#     chdir: /home/ubuntu/14-YG-FE
-#   register: fe_build_result
-#   failed_when: fe_build_result.rc != 0
-#   become: false
-
-# - name: Write build log manually
-#   copy:
-#     dest: /home/ubuntu/logs/fe_moongsan.log
-#     content: |
-#       ===== STDOUT =====
-#       {{ fe_build_result.stdout }}
-#       ===== STDERR =====
-#       {{ fe_build_result.stderr }}
-#   become: true
-
-# - name: Deploy built frontend to nginx
-#   shell: rsync -av --delete /home/ubuntu/14-YG-FE/dist/ /var/www/react/
-#   become: true
-
-# - name: Health check for React frontend (via localhost)
-#   uri:
-#     url: "https://{{ nginx.domain }}"
-#     return_content: yes
-#     validate_certs: no
-#   register: frontend_health
-#   failed_when: '''<div id="root">'' not in frontend_health.content'
-#   changed_when: false
+- name: Health check for React frontend (via localhost)
+  uri:
+    url: "https://{{ nginx.domain }}"
+    return_content: yes
+    validate_certs: no
+  register: frontend_health
+  failed_when: '''<div id="root">'' not in frontend_health.content'
+  changed_when: false
 
 - name: Ensure logrotate config for frontend exists
   copy:
