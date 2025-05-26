@@ -1,3 +1,11 @@
+---
+name: Cloud SubTask template
+about: 서브 태스크를 기록하고 관리하기 위한 템플릿입니다.
+title: "[SubTask]"
+labels: ["subtask"]
+assignees: ""
+
+---
 ### ✅ 완료한 작업
 
 - [x] AI 서비스용 FastAPI 서버 정상 배포
