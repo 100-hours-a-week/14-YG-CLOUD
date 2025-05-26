@@ -34,6 +34,15 @@
     owner: ubuntu
     group: ubuntu
 
+# build 전 캐시/이미지 정리
+- name: Prune unused Docker images (dangling only)
+  shell: docker image prune -f
+  become: true
+
+- name: Prune Docker builder cache
+  shell: docker builder prune -f
+  become: true
+
 # --- <운영으로 전환시 삭제>
 - name: Copy Dockerfile to BE repo for build
   copy:

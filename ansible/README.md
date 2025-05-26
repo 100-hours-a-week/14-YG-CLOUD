@@ -84,6 +84,40 @@ moongsan.com ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/lsh-study-k
 test.moongsan.com ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/lsh-study-key
 ```
 
+### 2. 태그 전략 및 배포 방식
+
+Docker 이미지 태그는 v1.*.* 형식을 기준으로 하며, 브랜치/배포 목적에 따라 다음과 같이 지정합니다.
+Ansible에서는 --extra-vars "ai_tag=..." 방식으로 태그를 명시해야 정확한 이미지가 배포됩니다.
+```bash
+# release 브랜치 (QA 서버용, 릴리즈 후보)
+ansible-playbook -i inventory.ini playbook.yml \
+  --limit test --tags fastapi \
+  --extra-vars "ai_tag=rc-1.0.0"
+
+# main 브랜치 (운영 서버용, 안정 버전)
+ansible-playbook -i inventory.ini playbook.yml \
+  --limit prod --tags fastapi \
+  --extra-vars "ai_tag=v1.0.0"
+```
+>💡 ai_tag는 group_vars/[env]/all.yml에서 기본값을 지정할 수 있지만,
+운영 환경에서는 반드시 명시적으로 --extra-vars를 통해 태그를 지정하는 것을 권장합니다.
+
+---
+
+### 3. Ansible에서 사용하는 태그 변수
+
+Ansible에서는 `group_vars/[env]/all.yml`의 `be.tag`, `ai.tag` 변수를 통해 이미지 태그를 지정합니다.
+
+```yaml
+# 예시
+dockerhub:
+  tag: "dev"   # dev 브랜치에서는 dev, main 브랜치에서는 latest 또는 prod-20240526 등으로 수동 변경
+```
+
+실제 배포 전 태그를 적절히 지정하지 않으면 이전 이미지가 pull되는 문제가 발생할 수 있습니다.
+
+---
+
 ## 🔐 변수 설정
 
 모든 환경별 변수는 `group_vars/[env]/all.yml` 하나의 파일에서 관리됩니다.  
@@ -188,7 +222,9 @@ Ansible 역할은 실제 배포 시나리오에 따라 순차적으로 실행됩
 - `group_vars/test/all.yml`에서 주입되는 변수를 기반으로 `.env.prod` 파일을 생성합니다.
 - Ansible은 Dockerfile을 기반으로 이미지를 pull → run까지 수행합니다.
 - 서비스 로그는 `/logs/be_moongsan.log`에 기록되며, logrotate 설정으로 관리됩니다.
-
+- 디스크 공간 확보를 위해 빌드 전마다 사용하지 않는 Docker 이미지 및 빌드 캐시를 정리합니다.
+  - `docker image prune -f`
+  - `docker builder prune -f`
 ---
 
 

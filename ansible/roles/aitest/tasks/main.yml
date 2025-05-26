@@ -106,6 +106,15 @@
 # 이 수정은 Docker 컨테이너의 환경 일관성 확보를 위한 임시 조치이며,
 # 추후 시스템 전체에 설치(pip install -r requirements.txt without --user)하는 방식으로 전환 가능.
 
+# build 전 캐시/이미지 정리
+- name: Prune unused Docker images (dangling only)
+  shell: docker image prune -f
+  become: true
+
+- name: Prune Docker builder cache
+  shell: docker builder prune -f
+  become: true
+
 # Docker build
 - name: Build Docker image for AI
   shell: >
