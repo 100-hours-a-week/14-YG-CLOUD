@@ -154,7 +154,14 @@ ansible-playbook -i inventory.ini playbook.yml \
 `ai.langsmith.*` | Langsmith 추적 설정 (api_key, project 등)
 `ai.tavily_api_keys.*` | Tavily 사용자별 키
 `ai.proxies[0]`, `ai.proxies[1]` | API 프록시 주소 리스트
-
+---
+#### `FE`
+| 이름 | 설명 |
+|------|------|
+| `fe.image` | 프론트엔드 Docker 이미지 경로 (ex. himello/fe_moongsan) |
+| `fe.tag` | 배포할 Docker 이미지 태그 (기본값: test) |
+| `fe.container_name` | 컨테이너 이름 |
+| `fe.port` | 호스트에서 노출할 포트 (기본값: 80) |
 
 ### 3. Playbook 실행
 
