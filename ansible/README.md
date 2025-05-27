@@ -259,6 +259,30 @@ Ansible 역할은 실제 배포 시나리오에 따라 순차적으로 실행됩
 
 ---
 
+### 🗃️ Step 7. DB 백업 자동화 구성
+
+**📁 역할: `db_backup`**
+
+- 백업 스크립트(`db_backup.sh`)는 `/var/script/{{ service_name }}/` 경로에 배치되며, 매일 새벽 3시에 cron으로 자동 실행됩니다.
+- DB 백업은 `mysqldump`를 통해 수행되며, 결과는 `/var/backup/{{ service_name }}/`에 `.sql` 파일로 저장됩니다.
+- 백업 파일명은 `moongsan_{{ env }}_db_YYYY-MM-DD-HH-MM.sql` 형식으로 환경별로 구분됩니다.
+- 생성된 백업 파일은 GCS(`gs://{{ gcs.name }}/{{ env }}/db/`)에 업로드됩니다.
+- 서비스 계정 키(`my-gcs-key.json`)는 Ansible 템플릿으로 자동 생성되며 `/var/secret/{{ service_name }}/`에 위치합니다.
+- 백업 실행 로그는 `/var/log/{{ service_name }}/db_backup.log`에 기록되며, logrotate로 일 1회 순환됩니다.
+
+**📦 생성 예시**
+
+| 경로 | 설명 |
+|------|------|
+| `/var/script/moongsan/db_backup.sh` | cron에서 실행되는 백업 스크립트 |
+| `/var/backup/moongsan/moongsan_test_db_2025-05-27-03-00.sql` | 환경별 백업 파일 |
+| `/var/log/moongsan/db_backup.log` | 로그 파일 |
+| `/var/secret/moongsan/my-gcs-key.json` | GCP 서비스 계정 키 (Vault 템플릿 기반) |
+
+> 💡 환경 정보(`env`), GCS 버킷명(`gcs.name`)은 `group_vars/[env]/all.yml`에서 명시적으로 정의됩니다.
+
+---
+
 ## 🌐 접근 URL
 
 | 서비스        | 예시 도메인                |

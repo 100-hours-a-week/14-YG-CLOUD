@@ -93,7 +93,7 @@
 
 - name: Ensure logs directory exists
   file:
-    path: "{{ log_path }}"
+    path: "{{ path.log }}"
     state: directory
     owner: ubuntu
     group: ubuntu
@@ -110,7 +110,7 @@
     published_ports:
       - "{{ be.port }}:8080"
     volumes:
-      - "{{ log_path }}:{{ log_path }}"
+      - "{{ path.log }}:{{ path.log }}"
     networks:
       - name: moongsan-net
 
@@ -123,7 +123,7 @@
   copy:
     dest: /etc/logrotate.d/be_moongsan
     content: |
-      {{ log_path }}/logs/be_moongsan.log {
+      {{ path.log }}/logs/be_moongsan.log {
           weekly
           rotate 4
           compress

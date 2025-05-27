@@ -164,7 +164,7 @@
     published_ports:
       - "{{ ai.port }}:8100"
     volumes:
-      - "{{ log_path }}:{{ log_path }}"
+      - "{{ path.log }}:{{ path.log }}"
     networks:
       - name: moongsan-net
 
@@ -249,7 +249,7 @@
 
 - name: Ensure ai log file is readable
   file:
-    path: "{{ log_path }}/ai_moongsan.log"
+    path: "{{ path.log }}/ai_moongsan.log"
     owner: ubuntu
     group: ubuntu
     mode: "0644"
@@ -258,7 +258,7 @@
   copy:
     dest: /etc/logrotate.d/ai_moongsan
     content: |
-      {{ log_path }}/ai_moongsan.log {
+      {{ path.log }}/ai_moongsan.log {
           weekly
           rotate 4
           compress

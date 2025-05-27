@@ -24,14 +24,7 @@
     name: google-cloud-sdk
     state: present
     update_cache: yes
-
-- name: Deploy DB backup script from template
-  template:
-    src: db_backup.sh.j2
-    dest: /home/ubuntu/db_backup.sh
-    owner: ubuntu
-    group: ubuntu
-    mode: "0755"
+  become: yes
 
 - name: Ensure DB backup and logs directories exist
   file:
@@ -41,21 +34,39 @@
     group: ubuntu
     mode: "0755"
   loop:
-    - /home/ubuntu/db_backup
-    - "{{ log_path }}"
+    - "{{ path.backup }}"
+    - "{{ path.log }}"
+    - "{{ path.script }}"
+    - "{{ path.secret }}"
+
+- name: Deploy DB backup script from template
+  template:
+    src: db_backup.sh.j2
+    dest: "{{ path.script }}/db_backup.sh"
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+
+- name: Deploy GCP service account key template
+  template:
+    src: gcs-key.json.j2
+    dest: "{{ path.secret }}/my-gcs-key.json"
+    owner: ubuntu
+    group: ubuntu
+    mode: "0600"
 
 - name: Schedule daily cronjob for DB backup
   cron:
     name: "Daily DB backup to GCS"
     user: root
-    job: 'PATH=/snap/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin GOOGLE_APPLICATION_CREDENTIALS="/home/ubuntu/my-gcs-key.json" /home/ubuntu/db_backup.sh >> {{ log_path }}/db_backup.log 2>&1'    minute: "00"
+    job: 'PATH=/snap/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin GOOGLE_APPLICATION_CREDENTIALS="{{ path.secret }}/my-gcs-key.json" {{ path.script }}/db_backup.sh >> {{ path.log }}/db_backup.log 2>&1'
     hour: "03"
 
 - name: Configure logrotate for DB backup log
   copy:
     dest: /etc/logrotate.d/db_backup
     content: |
-      {{ log_path }}/db_backup.log {
+      {{ path.log }}/db_backup.log {
           daily
           rotate 7
           compress
