@@ -44,7 +44,7 @@
 - name: Grant DB access to moongsan_admin from Docker host
   community.mysql.mysql_user:
     name: "{{ db.user }}"
-    host: "172.17.0.%"
+    host: "172.18.0.%"
     password: "{{ db.password }}"
     priv: "{{ db.name }}.*:ALL"
     state: present

@@ -218,6 +218,45 @@ Ansible 역할은 실제 배포 시나리오에 따라 순차적으로 실행됩
 
 ---
 
+### 🧪 Step 3-1. MySQL 접근 제어 트러블슈팅 (502 오류 해결 사례)
+
+Spring Boot 서버가 MySQL과 통신하지 못해 기동에 실패하고, Nginx를 통해 들어온 API 요청이 모두 `502 Bad Gateway`로 응답되는 문제가 발생했습니다. 
+
+문제 원인은 Spring 컨테이너가 `172.18.0.x` 대역 (사용자 정의 Docker 네트워크인 `moongsan-net`)을 사용하고 있었는데, MySQL 권한 설정에서는 기본 브리지 대역인 `172.17.0.%`만 허용되고 있었기 때문입니다.
+
+#### 🔍 로그 메시지
+```bash
+Host '172.18.0.2' is not allowed to connect to this MySQL server
+```
+
+#### ✅ 해결 방법
+Ansible의 `database` 역할에 다음 항목을 추가하여 권한을 부여합니다:
+```yaml
+- name: Grant DB access to moongsan_admin from moongsan-net
+  community.mysql.mysql_user:
+    name: "{{ db.user }}"
+    host: "172.18.0.%"
+    password: "{{ db.password }}"
+    priv: "{{ db.name }}.*:ALL"
+    state: present
+    login_user: "{{ db.root_user }}"
+    login_password: "{{ db.root_password }}"
+```
+
+추가 후 다음을 실행해 적용합니다:
+```bash
+ansible-playbook -i inventory.ini playbook.yml --limit test --tags database
+docker restart be_moongsan
+```
+
+#### 📌 참고 사항
+- Docker는 사용자 정의 네트워크 생성 시 자동으로 `172.18.0.0/16`, `172.19.0.0/16` 등을 순차적으로 할당합니다.
+- 추가 네트워크가 필요할 경우 이후 대역(예: `172.20.0.0/16`)도 자동 사용되므로, 접속 제어는 CIDR 범위로 확장 가능합니다.
+- 운영 보안을 위해 `host: '%'`는 지양하고, 실제 사용하는 네트워크 대역만 열어야 합니다.
+
+
+---
+
 ### 🧱 Step 4. 백엔드 애플리케이션 배포
 
 **📁 역할: `betest`**

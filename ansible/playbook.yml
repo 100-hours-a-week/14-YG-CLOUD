@@ -6,11 +6,8 @@
     - {role: monitoring, tags: monitoring} # 모니터링 패키지 설치
     - {role: database, tags: database} # db
     - {role: nginx_conf, tags: nginx_conf} # nginx conf
-    # - {role: fastapi, tags: fastapi}
     - {role: aitest, tags: fastapi} # fastapi
-    # - {role: backend, tags: backend}
     - {role: betest, tags: backend} # pr됐습니다~ -> 이거 실행 -> 배포되는지 확인
-    # - {role: frontend, tags: frontend}
     - {role: fetest, tags: frontend} # pr됐습니다~ -> 이거 실행 -> 배포되는지 확인
     - {role: db_backup, tags: db_backup} # db backup
 

@@ -19,7 +19,7 @@
 # --- docker로 전환
 - name: Ensure envs directory for backend exists
   file:
-    path: "/home/ubuntu/envs/{{ group_names[0] }}"
+    path: "/home/ubuntu/envs/{{ env }}"
     state: directory
     mode: "0755"
     owner: ubuntu
@@ -29,7 +29,7 @@
 - name: Generate .env.prod file from template
   template:
     src: env.prod.j2
-    dest: "/home/ubuntu/envs/{{ group_names[0] }}/backend.env.prod"
+    dest: "/home/ubuntu/envs/{{ env }}/backend.env.prod"
     mode: "0644"
     owner: ubuntu
     group: ubuntu
