@@ -37,4 +37,4 @@ COPY --from=builder /app /app
 RUN mkdir -p /var/log/moongsan && chown -R 1000:1000 /var/log/moongsan
 
 # 로그를 tee로 파일에 저장하며 동시에 콘솔 출력
-ENTRYPOINT ["bash", "-c", "uvicorn main:app --host 0.0.0.0 --port 8100 --log-level debug --access-log | tee -a /var/log/moongsan/ai_moongsan.log"]
+ENTRYPOINT ["bash", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8100 --log-level debug --access-log | tee -a /var/log/moongsan/ai_moongsan.log"]
