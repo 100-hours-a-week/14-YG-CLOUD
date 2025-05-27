@@ -13,4 +13,4 @@ COPY --from=builder /usr/local/lib/python3.11 /usr/local/lib/python3.11
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app /app
 
-ENTRYPOINT ["bash", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8100"]
+ENTRYPOINT ["bash", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8100 --log-level debug --access-log | tee -a /var/log/moongsan/ai_moongsan.log"]
