@@ -7,13 +7,13 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y gcc && rm -rf /var/lib/apt/lists/*
 
 # requirements 복사 및 설치
-COPY v1/requirements.txt .
+COPY requirements.txt .
 RUN pip install --upgrade pip && \ 
     pip install --no-cache-dir -r requirements.txt && \
     pip cache purge
 
 # 앱 소스 복사
-COPY v1 /app
+COPY . /app
 WORKDIR /app
 
 # 2단계: 실행 이미지
