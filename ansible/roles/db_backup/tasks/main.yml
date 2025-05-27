@@ -42,21 +42,20 @@
     mode: "0755"
   loop:
     - /home/ubuntu/db_backup
-    - /home/ubuntu/logs
+    - "{{ log_path }}"
 
 - name: Schedule daily cronjob for DB backup
   cron:
     name: "Daily DB backup to GCS"
     user: root
-    job: 'PATH=/snap/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin GOOGLE_APPLICATION_CREDENTIALS="/home/ubuntu/my-gcs-key.json" /home/ubuntu/db_backup.sh >> /home/ubuntu/logs/db_backup.log 2>&1'
-    minute: "00"
+    job: 'PATH=/snap/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin GOOGLE_APPLICATION_CREDENTIALS="/home/ubuntu/my-gcs-key.json" /home/ubuntu/db_backup.sh >> {{ log_path }}/db_backup.log 2>&1'    minute: "00"
     hour: "03"
 
 - name: Configure logrotate for DB backup log
   copy:
     dest: /etc/logrotate.d/db_backup
     content: |
-      /home/ubuntu/logs/db_backup.log {
+      {{ log_path }}/db_backup.log {
           daily
           rotate 7
           compress

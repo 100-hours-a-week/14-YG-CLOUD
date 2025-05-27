@@ -1,6 +1,6 @@
 #!/bin/bash
 # 리디렉션 (stdout, stderr 전부)
-exec >> /home/ubuntu/logs/db_backup.log 2>&1
+exec >> {{ log_path }}/db_backup.log 2>&1
 set -x
 
 # 명시적 PATH 설정
@@ -13,8 +13,8 @@ DB_PASS="{{ db.root_password }}"
 BACKUP_FILE="/home/ubuntu/db_backup/moongsan_prod_db_${DATE}.sql"
 GCS_PATH="gs://moongsan-backup/db/"
 
-echo "==== DB Backup started at $(date) ====" >> /home/ubuntu/logs/db_backup.log
+echo "==== DB Backup started at $(date) ====" >> {{ log_path }}/db_backup.log
 mysqldump -u root -p"${DB_PASS}" moongsan_prod_db > "${BACKUP_FILE}"
 
 export GOOGLE_APPLICATION_CREDENTIALS="/home/ubuntu/my-gcs-key.json"
-gsutil -o "Credentials:gs_service_key_file=/home/ubuntu/my-gcs-key.json" cp "${BACKUP_FILE}" "${GCS_PATH}" >> /home/ubuntu/logs/db_backup.log 2>&1
+gsutil -o "Credentials:gs_service_key_file=/home/ubuntu/my-gcs-key.json" cp "${BACKUP_FILE}" "${GCS_PATH}" >> {{ log_path }}/db_backup.log 2>&1
