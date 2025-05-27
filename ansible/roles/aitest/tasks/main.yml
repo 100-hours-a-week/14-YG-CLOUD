@@ -122,6 +122,12 @@
   shell: docker builder prune -f
   become: true
 
+- name: Ensure Docker network moongsan-net exists
+  community.docker.docker_network:
+    name: moongsan-net
+    state: present
+  become: true
+
 # Docker build
 - name: Build Docker image for AI
   shell: >
@@ -159,6 +165,8 @@
       - "{{ ai.port }}:8100"
     volumes:
       - "{{ log_path }}:{{ log_path }}"
+    networks:
+      - name: moongsan-net
 
 # # 3.10 버전 오류나서 3.11 직접 설치
 # - name: Ensure python3.11-venv is installed

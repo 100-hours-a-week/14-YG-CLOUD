@@ -51,6 +51,12 @@
   shell: docker builder prune -f
   become: true
 
+- name: Ensure Docker network moongsan-net exists
+  community.docker.docker_network:
+    name: moongsan-net
+    state: present
+  become: true
+
 # --- <운영으로 전환시 삭제>
 - name: Copy Dockerfile to BE repo for build
   copy:
@@ -105,6 +111,8 @@
       - "{{ be.port }}:8080"
     volumes:
       - "{{ log_path }}:{{ log_path }}"
+    networks:
+      - name: moongsan-net
 
 - name: Remove dangling images after deployment
   shell: docker image prune -f
