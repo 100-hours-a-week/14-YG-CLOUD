@@ -16,7 +16,7 @@ COPY --from=builder /usr/local/lib/python3.11 /usr/local/lib/python3.11
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # 소스코드만 선택적으로 복사 (환경 변수 제외)
-COPY app ./app
+COPY app/ ./
 COPY main.py . 
 
 # 포트 명시 (선택)
