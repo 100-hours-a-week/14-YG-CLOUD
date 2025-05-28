@@ -1,16 +1,25 @@
-# 1단계: builder
-FROM python:3.11 AS builder
+# 1단계: Builder
+FROM python:3.11-slim AS builder
+
 WORKDIR /app
+
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
-# 2단계: runtime
-FROM python:3.11
+# 2단계: Runtime
+FROM python:3.11-slim
+
 WORKDIR /app
 
-# 복사: site-packages + bin (uvicorn 등)
+# 런타임에는 site-packages만 복사 (실행에 필요한 패키지만)
 COPY --from=builder /usr/local/lib/python3.11 /usr/local/lib/python3.11
 COPY --from=builder /usr/local/bin /usr/local/bin
-COPY --from=builder /app /app
+
+# 소스코드만 선택적으로 복사 (환경 변수 제외)
+COPY app ./app
+COPY main.py .  # 또는 app/main.py 에서 직접 실행 시 생략 가능
+
+# 포트 명시 (선택)
+EXPOSE 8100
 
 ENTRYPOINT ["bash", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8100 --log-level debug --access-log | tee -a /var/log/moongsan/ai_moongsan.log"]
