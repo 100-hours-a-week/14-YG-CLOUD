@@ -3,15 +3,29 @@
     path: /home/ubuntu/14-YG-AI
   register: ai_repo_stat
 
+- name: Clean uncommitted changes in AI repo (if exists)
+  shell: |
+    git reset --hard
+    git clean -fd
+  args:
+    chdir: /home/ubuntu/14-YG-AI
+  when: ai_repo_stat.stat.exists
+
 - name: Clone AI repo if not present
   git:
     repo: https://github.com/100-hours-a-week/14-YG-AI.git
     dest: /home/ubuntu/14-YG-AI
-    version: release/v1.0.0
+    version: dev
     update: yes
-    force: no
+    force: yes
     accept_hostkey: yes
-  when: not ai_repo_stat.stat.exists
+
+# - name: Patch import path in main.py
+#   replace:
+#     path: /home/ubuntu/14-YG-AI/v1/app/main.py
+#     regexp: "^from api import generate_post"
+#     replace: "from app.api import generate_post"
+#   become: true
 
 # ansible/roles/aitest/tasks/patch_requirements.yml
 # --- requirements.txt 수정 이유 ---
@@ -43,18 +57,18 @@
     line: "opencv-python-headless==4.9.0.80"
     insertafter: EOF
 
-- name: Set pytest-mock to specific version
-  lineinfile:
-    path: /home/ubuntu/14-YG-AI/v1/requirements.txt
-    regexp: "^pytest-mock"
-    line: "pytest-mock==3.14.0"
+# - name: Set pytest-mock to specific version
+#   lineinfile:
+#     path: /home/ubuntu/14-YG-AI/v1/requirements.txt
+#     regexp: "^pytest-mock"
+#     line: "pytest-mock==3.14.0"
 
-- name: Ensure uvicorn is present
-  lineinfile:
-    path: /home/ubuntu/14-YG-AI/v1/requirements.txt
-    regexp: "^uvicorn"
-    line: "uvicorn[standard]"
-    insertafter: EOF
+# - name: Ensure uvicorn is present
+#   lineinfile:
+#     path: /home/ubuntu/14-YG-AI/v1/requirements.txt
+#     regexp: "^uvicorn"
+#     line: "uvicorn[standard]"
+#     insertafter: EOF
 
 # - name: Ensure .gitignore excludes local-only secret files
 #   lineinfile:
@@ -107,6 +121,13 @@
     remote_src: true
   become: true
 
+# - name: Copy .dockerignore to AI repo
+#   copy:
+#     src: /home/ubuntu/14-YG-CLOUD/docker/ai/.dockerignore
+#     dest: /home/ubuntu/14-YG-AI/v1/.dockerignore
+#     remote_src: true
+#   become: true
+
 # uvicorn이 pip --user 경로인 /root/.local/bin에 설치되었기 때문에,
 # bash 실행 시 해당 경로가 PATH에 반영되지 않아 uvicorn 명령어를 인식하지 못함.
 # 따라서 ENTRYPOINT에서 uvicorn의 전체 경로(/root/.local/bin/uvicorn)를 명시적으로 사용함.
@@ -131,8 +152,7 @@
 # Docker build
 - name: Build Docker image for AI
   shell: >
-    docker build -t {{ ai.image }}:{{ ai.tag }}
-    -f Dockerfile .
+    docker build -t {{ ai.image }}:{{ ai.tag }} -f Dockerfile . > /tmp/ai_build.log 2>&1
   args:
     chdir: /home/ubuntu/14-YG-AI/v1
   become: true
@@ -165,6 +185,7 @@
       - "{{ ai.port }}:8100"
     volumes:
       - "{{ path.log }}:{{ path.log }}"
+      - "/home/ubuntu/14-YG-AI/v1/deft-observer-456807-c5-e9dda0532301.json:/app/deft-observer-456807-c5-e9dda0532301.json"
     networks:
       - name: moongsan-net
 
