@@ -17,7 +17,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 # 소스코드만 선택적으로 복사 (환경 변수 제외)
 COPY app ./app
-COPY main.py .  # 또는 app/main.py 에서 직접 실행 시 생략 가능
+COPY main.py . 
 
 # 포트 명시 (선택)
 EXPOSE 8100
