@@ -1,0 +1,163 @@
+- name: Check if AI repo already exists
+  stat:
+    path: /home/ubuntu/14-YG-AI
+  register: ai_repo_stat
+
+- name: Clean uncommitted changes in AI repo (if exists)
+  shell: |
+    git reset --hard
+    git clean -fd
+  args:
+    chdir: /home/ubuntu/14-YG-AI
+  when: ai_repo_stat.stat.exists
+
+- name: Clone AI repo if not present
+  git:
+    repo: https://github.com/100-hours-a-week/14-YG-AI.git
+    dest: /home/ubuntu/14-YG-AI
+    version: "{{ branch }}"
+    update: yes
+    force: yes
+    accept_hostkey: yes
+
+- name: Ensure PyYAML is present with version
+  lineinfile:
+    path: /home/ubuntu/14-YG-AI/v1/requirements.txt
+    regexp: "^PyYAML"
+    line: "PyYAML>=6.0"
+    insertafter: EOF
+    create: yes
+
+- name: Ensure torch==2.3.0 is present
+  lineinfile:
+    path: /home/ubuntu/14-YG-AI/v1/requirements.txt
+    regexp: "^torch"
+    line: "torch==2.3.0"
+    insertafter: EOF
+
+- name: Ensure opencv-python-headless==4.9.0.80 is present
+  lineinfile:
+    path: /home/ubuntu/14-YG-AI/v1/requirements.txt
+    regexp: "^opencv-python-headless"
+    line: "opencv-python-headless==4.9.0.80"
+    insertafter: EOF
+
+- name: Copy Dockerfile to AI repo
+  template:
+    src: Dockerfile.j2
+    dest: /home/ubuntu/14-YG-AI/v1/Dockerfile
+    mode: "0644"
+  become: true
+
+- name: Get git commit hash for AI
+  command: git rev-parse --short HEAD
+  args:
+    chdir: /home/ubuntu/14-YG-AI
+  register: ai_git_commit
+
+- name: Set ai git commit fact
+  set_fact:
+    git_commit: "{{ ai_git_commit.stdout }}"
+
+# 환경 변수 + GCP 서비스 계정 키 파일을 템플릿에서 생성
+- name: Generate .env file from template
+  template:
+    src: .env.j2
+    dest: "{{ path.secret }}/.env"
+    mode: "0644"
+
+- name: Generate GCP service account key file from template
+  template:
+    src: service-account.json.j2
+    dest: "{{ path.secret }}/{{ ai.gcp.credentials }}"
+    mode: "0600"
+
+# build 전 캐시/이미지 정리
+- name: Prune unused Docker images (dangling only)
+  shell: docker image prune -f
+  become: true
+
+- name: Prune Docker builder cache
+  shell: docker builder prune -f
+  become: true
+
+- name: Ensure Docker network moongsan-net exists
+  community.docker.docker_network:
+    name: moongsan-net
+    state: present
+  become: true
+
+# Docker build
+- name: Build Docker image for AI
+  shell: >
+    docker build -t {{ ai.image }}:{{ ai.tag }} -f Dockerfile . > /tmp/ai_build.log 2>&1
+  args:
+    chdir: /home/ubuntu/14-YG-AI/v1
+  become: true
+
+# DockerHub 로그인
+- name: DockerHub 로그인
+  shell: echo "{{ dockerhub.password }}" | docker login --username {{ dockerhub.username }} --password-stdin
+  become: true
+
+# Docker 이미지 푸시
+- name: Push Docker image to registry
+  shell: docker push {{ ai.image }}:{{ ai.tag }}
+  become: true
+
+# Docker 이미지 풀 (푸시 후 검증)
+- name: Pull AI image from registry
+  shell: docker pull {{ ai.image }}:{{ ai.tag }}
+  become: true
+
+- name: Ensure AI log directory exists
+  file:
+    path: "{{ path.log }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+
+- name: Create AI log file if missing
+  file:
+    path: "{{ path.log }}/ai_moongsan.log"
+    state: touch
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+
+# Docker run
+- name: Run AI container
+  community.docker.docker_container:
+    name: "{{ ai.container_name }}"
+    image: "{{ ai.image }}:{{ ai.tag }}"
+    state: started
+    restart_policy: unless-stopped
+    recreate: true
+    env_file: "{{ path.secret }}/.env"
+    published_ports:
+      - "{{ ai.port }}:8100"
+    volumes:
+      - "{{ path.log }}:{{ path.log }}"
+      - "{{ path.secret }}:{{ path.secret }}"
+    networks:
+      - name: moongsan-net
+
+- name: Remove dangling images after deployment
+  shell: docker image prune -f
+  become: true
+
+- name: Ensure logrotate config for ai_deploy ai exists
+  copy:
+    dest: /etc/logrotate.d/ai_moongsan
+    content: |
+      {{ path.log }}/ai_moongsan.log {
+          weekly
+          rotate 4
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0644 ubuntu ubuntu
+      }
+  become: true

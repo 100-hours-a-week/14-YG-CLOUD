@@ -1,16 +1,20 @@
 # 깃허브 repo에서 be를 clone
-- name: Force update betest backend repository
-  shell: |
-    if [ -d /home/ubuntu/14-YG-BE ]; then
-      cd /home/ubuntu/14-YG-BE && git fetch origin && git checkout -B main origin/main
-    else
-      git clone -b main https://github.com/100-hours-a-week/14-YG-BE.git /home/ubuntu/14-YG-BE
-    fi
-  args:
-    executable: /bin/bash
+- name: Remove existing BE repo completely
+  file:
+    path: /home/ubuntu/14-YG-BE
+    state: absent
 
-# betest 레포의 소유권을 ubuntu로 변경
-- name: Mark betest repo as safe for git
+- name: Fresh clone of be_deploy backend repository
+  git:
+    repo: https://github.com/100-hours-a-week/14-YG-BE.git
+    dest: /home/ubuntu/14-YG-BE
+    version: "{{ branch }}"
+    update: yes
+    force: yes
+    accept_hostkey: yes
+
+# be_deploy 레포의 소유권을 ubuntu로 변경
+- name: Mark be_deploy repo as safe for git
   shell: git config --global --add safe.directory /home/ubuntu/14-YG-BE
   become: false
   args:
@@ -19,7 +23,7 @@
 # --- docker로 전환
 - name: Ensure envs directory for backend exists
   file:
-    path: "/home/ubuntu/envs/{{ env }}"
+    path: "{{ path.secret }}"
     state: directory
     mode: "0755"
     owner: ubuntu
@@ -29,7 +33,7 @@
 - name: Generate .env.prod file from template
   template:
     src: env.prod.j2
-    dest: "/home/ubuntu/envs/{{ env }}/backend.env.prod"
+    dest: "{{ path.secret }}/backend.env.prod"
     mode: "0644"
     owner: ubuntu
     group: ubuntu
@@ -57,12 +61,22 @@
     state: present
   become: true
 
+- name: Get git commit hash for backend
+  command: git rev-parse --short HEAD
+  args:
+    chdir: /home/ubuntu/14-YG-BE
+  register: be_git_commit
+
+- name: Set be git commit fact
+  set_fact:
+    git_commit: "{{ be_git_commit.stdout }}"
+
 # --- <운영으로 전환시 삭제>
-- name: Copy Dockerfile to BE repo for build
-  copy:
-    src: /home/ubuntu/14-YG-CLOUD/docker/backend/Dockerfile
+- name: Copy Dockerfile to BE repo
+  template:
+    src: Dockerfile.j2
     dest: /home/ubuntu/14-YG-BE/Dockerfile
-    remote_src: true
+    mode: "0644"
   become: true
 
 - name: Build Docker image for backend
@@ -106,7 +120,7 @@
     state: started
     recreate: true # always recreate for fresh image
     restart_policy: unless-stopped
-    env_file: "/home/ubuntu/envs/test/backend.env.prod"
+    env_file: "{{ path.secret }}/backend.env.prod"
     published_ports:
       - "{{ be.port }}:8080"
     volumes:
@@ -119,11 +133,11 @@
   become: true
 
 # logrotate 설정
-- name: Ensure logrotate config for betest backend exists
+- name: Ensure logrotate config for be_deploy backend exists
   copy:
     dest: /etc/logrotate.d/be_moongsan
     content: |
-      {{ path.log }}/logs/be_moongsan.log {
+      {{ path.log }}/be_moongsan.log {
           weekly
           rotate 4
           compress

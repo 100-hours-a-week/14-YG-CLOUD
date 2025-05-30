@@ -11,3 +11,6 @@ terraform/terraform.tfstate
 terraform/terraform.tfstate.backup
 
 .DS_Store
+
+# sql
+ansible/roles/db_fix/files/*

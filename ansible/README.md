@@ -9,7 +9,7 @@
 |-------------------|-----------------------------------------------------------|
 | **common**        | 서버 공통 환경 구성 (Docker, nginx, certbot 등)                |
 | **nginx_conf**    | Nginx 설정 및 HTTPS 인증서 발급 자동화                          |
-| **betest**        | 백엔드 배포 전용 역할 (레포 클론 → env 생성 → docker compose 실행) |
+| **be_deploy**        | 백엔드 배포 전용 역할 (레포 클론 → env 생성 → docker compose 실행) |
 | **database**      | MySQL 서버 설치 및 초기 사용자/DB 설정                          |
 
 
@@ -26,7 +26,7 @@ ansible/
 ├── roles/
 │   ├── common/
 │   ├── nginx_conf/
-│   ├── betest/
+│   ├── be_deploy/
 │   └── database/
 ```
 
@@ -173,7 +173,7 @@ ansible-playbook -i inventory.ini playbook.yml --limit test --tags common
 ansible-playbook -i inventory.ini playbook.yml --limit test --tags nginx_conf
 
 # 백엔드 배포
-ansible-playbook -i inventory.ini playbook.yml --limit test --tags betest --extra-vars "tag=test-1.0.0"
+ansible-playbook -i inventory.ini playbook.yml --limit test --tags be_deploy --extra-vars "tag=test-1.0.0"
 
 # DB 설치 및 초기 설정
 ansible-playbook -i inventory.ini playbook.yml --limit test --tags database
@@ -259,7 +259,7 @@ docker restart be_moongsan
 
 ### 🧱 Step 4. 백엔드 애플리케이션 배포
 
-**📁 역할: `betest`**
+**📁 역할: `be_deploy`**
 
 - 백엔드 레포지토리(`14-YG-BE`)를 clone 또는 fetch/reset 합니다.
 - `group_vars/test/all.yml`에서 주입되는 변수를 기반으로 `.env.prod` 파일을 생성합니다.
@@ -273,19 +273,19 @@ docker restart be_moongsan
 
 ### 🧠 Step 5. AI 서비스 패키지 버전 고정 (임시 수정 내역)
 
-**📁 역할: `aitest`**
+**📁 역할: `ai_deploy`**
 
 - FastAPI 기반 AI 애플리케이션을 `/home/ubuntu/14-YG-AI`에 배치합니다.
 - .env 및 GCP 인증 키 파일을 템플릿으로 자동 생성합니다.
 - 멀티 스테이지 Dockerfile을 활용해 이미지 빌드 및 실행을 자동화하며, 최적화된 대형 패키지를 포함합니다.
-- /generation/description에서 상품 상세 설명을 생성하며, 로그는 /var/log/moongsan/ai_moongsan.log에 기록됩니다.
+- /generation/description에서 상품 상세 설명을 생성하며, 로그는 /var/moongsan/log/ai_moongsan.log에 기록됩니다.
 - 배포 후 불필요한 이미지/캐시는 자동 정리됩니다.
 
 ---
 
 ### 🧾 Step 6. 프론트엔드 애플리케이션 배포
 
-**📁 역할: `fetest`**
+**📁 역할: `fe_deploy`**
 
 - 프론트엔드 레포지토리(`14-YG-FE`)를 clone 또는 fetch/reset 합니다.
 - `.env` 파일을 템플릿(`vite.env.j2`)으로 생성하여 `VITE_BASE_URL`을 환경에 맞게 자동 주입합니다.
@@ -315,7 +315,7 @@ docker restart be_moongsan
 |------|------|
 | `/var/script/moongsan/db_backup.sh` | cron에서 실행되는 백업 스크립트 |
 | `/var/backup/moongsan/moongsan_test_db_2025-05-27-03-00.sql` | 환경별 백업 파일 |
-| `/var/log/moongsan/db_backup.log` | 로그 파일 |
+| `/var/moongsan/log/db_backup.log` | 로그 파일 |
 | `/var/secret/moongsan/my-gcs-key.json` | GCP 서비스 계정 키 (Vault 템플릿 기반) |
 
 > 💡 환경 정보(`env`), GCS 버킷명(`gcs.name`)은 `group_vars/[env]/all.yml`에서 명시적으로 정의됩니다.

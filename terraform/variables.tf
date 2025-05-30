@@ -25,6 +25,6 @@ variable "ssh_public_key_path" {
 
 variable "env" {
   description = "Environment name"
-  default     = "test"
+  default     = "dev"
   type        = string
 }
