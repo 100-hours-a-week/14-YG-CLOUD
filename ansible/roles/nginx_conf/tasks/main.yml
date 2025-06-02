@@ -25,6 +25,29 @@
     force: yes
     mode: "0644"
 
+- name: Ensure passlib (apt) is installed
+  apt:
+    name: python3-pip
+    state: present
+    update_cache: yes
+  become: true
+
+- name: Ensure passlib (full) is installed via pip
+  pip:
+    name: passlib
+    state: latest
+    executable: pip3
+  become: true
+
+- name: htpasswd 파일 생성 후 devuser 등록
+  community.general.htpasswd:
+    path: /etc/nginx/.htpasswd
+    name: "{{ nginx.devuser }}"
+    password: "{{ nginx.devuser_password }}"
+    crypt_scheme: apr_md5_crypt
+    state: present
+  become: true
+
 - name: Reload nginx
   service:
     name: nginx

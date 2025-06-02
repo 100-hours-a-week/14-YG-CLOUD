@@ -14,13 +14,6 @@
     group: ubuntu
   become: true
 
-# - name: Generate vite.config.ts from template
-#   template:
-#     src: vite.config.ts.j2
-#     dest: /home/ubuntu/14-YG-FE/vite.config.ts
-#     mode: "0644"
-#   become: true
-
 - name: Generate .env file for Vite
   template:
     src: vite.env.j2

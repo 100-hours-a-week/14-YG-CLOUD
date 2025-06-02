@@ -11,6 +11,7 @@ RUN ./gradlew clean bootJar -x test
 
 FROM eclipse-temurin:21-jdk
 WORKDIR /app
+COPY config/application-secrets.yml ./config/application-secrets.yml
 RUN mkdir -p /var/moongsan/log && chown -R 1000:1000 /var/moongsan/log
 COPY --from=builder /app/build/libs/*.jar app.jar
-CMD ["sh", "-c", "java -jar app.jar | tee -a /var/moongsan/log/be_moongsan.log"]
+CMD ["sh", "-c", "java -Dspring.config.name=application-secrets -jar app.jar | tee -a /var/moongsan/log/be_moongsan.log"]
