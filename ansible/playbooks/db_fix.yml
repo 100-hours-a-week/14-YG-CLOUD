@@ -1,0 +1,6 @@
+- name: Maintenance tasks (backup & dump restore)
+  hosts: "{{ target }}"
+  become: yes
+
+  roles:
+    - role: db_fix

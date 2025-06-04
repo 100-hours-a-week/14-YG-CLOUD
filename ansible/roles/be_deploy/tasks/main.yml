@@ -55,12 +55,6 @@
   shell: docker builder prune -f
   become: true
 
-- name: Ensure Docker network moongsan-net exists
-  community.docker.docker_network:
-    name: moongsan-net
-    state: present
-  become: true
-
 - name: Get git commit hash for backend
   command: git rev-parse --short HEAD
   args:

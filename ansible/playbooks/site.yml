@@ -1,0 +1,14 @@
+- name: Initial provisioning / Deploy all core services
+  hosts: "{{ target }}"
+  become: yes
+
+  roles:
+    - role: common
+    - role: docker_net
+    - role: database
+    - role: redis
+    - role: nginx_conf
+    - role: be_deploy
+    - role: ai_deploy
+    - role: fe_deploy
+    - role: db_backup

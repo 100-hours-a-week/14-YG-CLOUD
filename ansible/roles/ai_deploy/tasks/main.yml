@@ -81,12 +81,6 @@
   shell: docker builder prune -f
   become: true
 
-- name: Ensure Docker network moongsan-net exists
-  community.docker.docker_network:
-    name: moongsan-net
-    state: present
-  become: true
-
 # Docker build
 - name: Build Docker image for AI
   shell: >
