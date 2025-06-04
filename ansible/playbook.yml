@@ -1,0 +1,28 @@
+- name: Setup Production Server
+  hosts: prod
+  become: yes
+  roles:
+    # - {role: common, tags: common} # 공통 패키지 설치 sudo apt update & install
+    # - {role: monitoring, tags: monitoring} # 모니터링 패키지 설치
+    # - {role: database, tags: database} # db
+    # - {role: nginx_conf, tags: nginx_conf} # nginx conf
+    # - {role: ai_deploy, tags: fastapi} # fastapi
+    # - {role: be_deploy, tags: backend} # pr됐습니다~ -> 이거 실행 -> 배포되는지 확인
+    # - {role: fe_deploy, tags: frontend} # pr됐습니다~ -> 이거 실행 -> 배포되는지 확인
+    # - {role: db_backup, tags: db_backup} # db backup
+
+- name: Setup test Server
+  hosts: dev
+  become: yes
+  roles:
+    - {role: common, tags: common} # 공통 패키지 설치
+    - {role: clone_cloud, tags: clone_cloud} # cloud 레포 clone : 실행 X
+    - {role: nginx_conf, tags: nginx} # nginx 설정(ssl 포함)
+    - {role: database, tags: db} # 호스트 서버에 db(mysql) 설치
+    - {role: be_deploy, tags: be} # backend
+    - {role: ai_deploy, tags: ai} # fastapi
+    - {role: fe_deploy, tags: fe} # frontend
+    - {role: db_backup, tags: db_backup} # db dump 파일 백업
+    - {role: redis, tags: redis}
+    - {role: db_fix, tags: db_fix} # db dump 파일 복구
+    - {role: docker_net, tags: docker_net} # docker network 생성

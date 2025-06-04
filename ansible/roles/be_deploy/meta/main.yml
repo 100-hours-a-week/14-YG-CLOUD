@@ -1,0 +1,4 @@
+dependencies:
+  - role: clone_cloud
+  - role: docker_net
+  - role: redis

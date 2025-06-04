@@ -1,0 +1,149 @@
+# 깃허브 repo에서 be를 clone
+- name: Remove existing BE repo completely
+  file:
+    path: /home/ubuntu/14-YG-BE
+    state: absent
+
+- name: Fresh clone of be_deploy backend repository
+  git:
+    repo: https://github.com/100-hours-a-week/14-YG-BE.git
+    dest: /home/ubuntu/14-YG-BE
+    version: "{{ branch }}"
+    update: yes
+    force: yes
+    accept_hostkey: yes
+
+# be_deploy 레포의 소유권을 ubuntu로 변경
+- name: Mark be_deploy repo as safe for git
+  shell: git config --global --add safe.directory /home/ubuntu/14-YG-BE
+  become: false
+  args:
+    executable: /bin/bash
+
+# --- docker로 전환
+- name: Ensure envs directory for backend exists
+  file:
+    path: "{{ path.secret }}"
+    state: directory
+    mode: "0755"
+    owner: ubuntu
+    group: ubuntu
+
+# 환경 변수 파일 생성
+- name: Generate .env.prod file from template
+  template:
+    src: env.prod.j2
+    dest: "{{ path.secret }}/backend.env.prod"
+    mode: "0644"
+    owner: ubuntu
+    group: ubuntu
+
+- name: Ensure CORS allows dev/test domains
+  lineinfile:
+    path: /home/ubuntu/14-YG-BE/src/main/java/com/moogsan/moongsan_backend/global/config/SecurityConfig.java
+    insertafter: '^\s*config\.setAllowedOrigins\(List\.of\($'
+    line: '                "https://{{ nginx.domain }}",'
+    state: present
+  become: true
+
+# build 전 캐시/이미지 정리
+- name: Prune unused Docker images (dangling only)
+  shell: docker image prune -f
+  become: true
+
+- name: Prune Docker builder cache
+  shell: docker builder prune -f
+  become: true
+
+- name: Ensure Docker network moongsan-net exists
+  community.docker.docker_network:
+    name: moongsan-net
+    state: present
+  become: true
+
+- name: Get git commit hash for backend
+  command: git rev-parse --short HEAD
+  args:
+    chdir: /home/ubuntu/14-YG-BE
+  register: be_git_commit
+
+- name: Set be git commit fact
+  set_fact:
+    git_commit: "{{ be_git_commit.stdout }}"
+
+# --- <운영으로 전환시 삭제>
+- name: Copy Dockerfile to BE repo
+  template:
+    src: Dockerfile.j2
+    dest: /home/ubuntu/14-YG-BE/Dockerfile
+    mode: "0644"
+  become: true
+
+- name: Build Docker image for backend
+  shell: >
+    docker build -t {{ be.image }}:{{ be.tag }}
+    -f Dockerfile .
+  args:
+    chdir: /home/ubuntu/14-YG-BE
+  become: true
+
+- name: DockerHub 로그인
+  shell: echo "{{ dockerhub.password }}" | docker login --username {{ dockerhub.username }} --password-stdin
+  become: true
+
+- name: Push Docker image to registry
+  shell: docker push {{ be.image }}:{{ be.tag }}
+  become: true
+# --- </운영으로 전환시 삭제>
+
+- name: Pull image from registry (post-push validation)
+  shell: docker pull {{ be.image }}:{{ be.tag }}
+  become: true
+
+- name: Ensure backend container is absent before redeployment
+  community.docker.docker_container:
+    name: "{{ be.container_name }}"
+    state: absent
+
+- name: Ensure logs directory exists
+  file:
+    path: "{{ path.log }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+
+- name: Run backend container
+  community.docker.docker_container:
+    name: "{{ be.container_name }}"
+    image: "{{ be.image }}:{{ be.tag }}"
+    state: started
+    recreate: true # always recreate for fresh image
+    restart_policy: unless-stopped
+    env_file: "{{ path.secret }}/backend.env.prod"
+    published_ports:
+      - "{{ be.port }}:8080"
+    volumes:
+      - "{{ path.log }}:{{ path.log }}"
+    networks:
+      - name: moongsan-net
+
+- name: Remove dangling images after deployment
+  shell: docker image prune -f
+  become: true
+
+# logrotate 설정
+- name: Ensure logrotate config for be_deploy backend exists
+  copy:
+    dest: /etc/logrotate.d/be_moongsan
+    content: |
+      {{ path.log }}/be_moongsan.log {
+          weekly
+          rotate 4
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0644 ubuntu ubuntu
+      }
+  become: true

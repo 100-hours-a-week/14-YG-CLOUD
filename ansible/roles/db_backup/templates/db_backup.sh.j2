@@ -1,0 +1,20 @@
+#!/bin/bash
+# 리디렉션 (stdout, stderr 전부)
+exec >> {{ path.log }}/db_backup.log 2>&1
+set -x
+
+# 명시적 PATH 설정
+export PATH=/snap/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export GOOGLE_APPLICATION_CREDENTIALS="{{ path.secret }}/my-gcs-key.json"
+
+# DB 백업
+DATE=$(date +%F-%H-%M)
+DB_PASS="{{ db.root_password }}"
+BACKUP_FILE="{{ path.backup }}/moongsan_{{ env }}_db_${DATE}.sql"
+GCS_PATH="gs://{{ gcs.name }}/{{ env }}/db/"
+
+echo "==== DB Backup started at $(date) ====" >> {{ path.log }}/db_backup.log
+mysqldump -u root -p"${DB_PASS}" moongsan_{{ env }}_db > "${BACKUP_FILE}"
+
+export GOOGLE_APPLICATION_CREDENTIALS="{{ path.secret }}/my-gcs-key.json"
+gsutil -o "Credentials:gs_service_key_file={{ path.secret }}/my-gcs-key.json" cp "${BACKUP_FILE}" "${GCS_PATH}" >> {{ path.log }}/db_backup.log 2>&1

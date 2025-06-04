@@ -1,0 +1,78 @@
+- name: Ensure MySQL server is installed (fail-safe)
+  apt:
+    name: mysql-server
+    state: present
+    update_cache: yes
+  become: true
+
+- name: Restart MySQL
+  service:
+    name: mysql
+    state: restarted
+
+- name: Convert MySQL root user to mysql_native_password
+  shell: |
+    mysql -u root -p'{{ db.root_password }}' <<EOF
+    ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '{{ db.root_password }}';
+    FLUSH PRIVILEGES;
+    EOF
+  become: true
+
+- name: Create database
+  community.mysql.mysql_db:
+    name: "{{ db.name }}"
+    state: present
+    encoding: utf8mb4
+    collation: utf8mb4_general_ci
+    login_user: "{{ db.root_user }}"
+    login_password: "{{ db.root_password }}"
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+- name: Create database user and grant privileges
+  community.mysql.mysql_user:
+    name: "{{ db.user }}"
+    password: "{{ db.password }}"
+    priv: "{{ db.name }}.*:ALL"
+    host: localhost
+    state: present
+    login_user: "{{ db.root_user }}"
+    login_password: "{{ db.root_password }}"
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+- name: Grant DB access to moongsan_admin from Docker host
+  community.mysql.mysql_user:
+    name: "{{ db.user }}"
+    host: "172.18.0.%"
+    password: "{{ db.password }}"
+    priv: "{{ db.name }}.*:ALL"
+    state: present
+    login_user: "{{ db.root_user }}"
+    login_password: "{{ db.root_password }}"
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+- name: Set system timezone to Asia/Seoul
+  command: timedatectl set-timezone Asia/Seoul
+  when: ansible_date_time.tz != "KST"
+
+- name: Set MySQL default timezone
+  lineinfile:
+    path: /etc/mysql/mysql.conf.d/mysqld.cnf
+    regexp: "^default-time-zone"
+    line: 'default-time-zone = "+09:00"'
+    insertafter: "[mysqld]"
+
+- name: Set MySQL bind-address to 0.0.0.0
+  lineinfile:
+    path: /etc/mysql/mysql.conf.d/mysqld.cnf
+    regexp: "^bind-address"
+    line: "bind-address = 0.0.0.0"
+    insertafter: "[mysqld]"
+  notify: Restart MySQL
+  become: true
+# - name: Restart MySQL
+#   service:
+#     name: mysql
+#     state: restarted

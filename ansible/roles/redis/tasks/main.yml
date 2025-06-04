@@ -1,0 +1,10 @@
+- name: Redis Container
+  community.docker.docker_container:
+    name: "{{ be.redis.host }}"
+    image: redis:7.2
+    state: started
+    restart_policy: always
+    networks:
+      - name: moongsan-net
+    published_ports:
+      - "6379:6379"

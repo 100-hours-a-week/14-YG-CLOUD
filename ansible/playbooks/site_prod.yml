@@ -1,0 +1,12 @@
+---
+- name: Prod 환경 3-티어 배포
+  hosts: all
+  vars_files:
+    - "../inventories/prod/group_vars/all.yml"
+  roles:
+    - common
+    - db
+    - redis
+    - backend
+    - ai
+    - frontend
