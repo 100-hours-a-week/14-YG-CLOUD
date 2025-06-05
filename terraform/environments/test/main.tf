@@ -51,7 +51,7 @@ module "wireguard" {
   allowed_ips               = "10.8.0.0/24,10.0.0.0/24"
 }
 
-# Jump Box VM (WireGuard 서버)
+# Jump Box VM (WireGuard 서버) - 최적화됨
 module "jumpbox" {
   source = "../../modules/compute"
 
@@ -60,7 +60,8 @@ module "jumpbox" {
   vm_name             = "jumpbox"
   vm_role             = "jumpbox"
   tier                = "management"
-  machine_type        = "e2-medium"
+  machine_type        = "e2-small"         # 최적화: e2-medium → e2-small (57% 비용 절약)
+  disk_size           = 20                 # 최적화: 50GB → 20GB (충분함)
   zone                = var.zone
   network_name        = module.network.vpc_name
   subnet_name         = module.network.subnet_name
@@ -90,6 +91,7 @@ module "backend" {
   vm_role             = "backend"
   tier                = "app"
   machine_type        = "e2-standard-2"
+  disk_size           = 30                 # 최적화: 50GB → 30GB (Spring Boot + 로그용)
   zone                = var.zone
   network_name        = module.network.vpc_name
   subnet_name         = module.network.subnet_name
@@ -108,7 +110,8 @@ module "ai" {
   vm_name             = "ai"
   vm_role             = "ai"
   tier                = "app"
-  machine_type        = "e2-highmem-2"
+  machine_type        = "e2-highmem-2"     # 16GB 메모리 유지, 비용 최적화
+  disk_size           = 40                 # 최적화: 50GB → 40GB (AI 모델용 여유 유지)
   zone                = var.zone
   network_name        = module.network.vpc_name
   subnet_name         = module.network.subnet_name
@@ -136,4 +139,18 @@ module "database" {
   network_tags        = ["internal"]
   ssh_public_key_path = var.ssh_public_key_path
   # startup_script 제거 - Ansible로 애플리케이션 설정 관리
+}
+
+# Load Balancer - 3-tier 아키텍처 완성
+module "load_balancer" {
+  source = "../../modules/load_balancer"
+
+  project_name        = var.project_name
+  env                 = var.env
+  zone                = var.zone
+  network_self_link   = module.network.vpc_self_link
+  backend_instances   = [module.backend.self_link]
+  ai_instances        = [module.ai.self_link]
+  enable_https        = false  # 초기에는 HTTP만 사용
+  ssl_domains         = []
 }

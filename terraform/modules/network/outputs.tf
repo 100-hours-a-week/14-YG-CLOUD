@@ -8,6 +8,11 @@ output "vpc_name" {
   value       = google_compute_network.vpc.name
 }
 
+output "vpc_self_link" {
+  description = "Self link of the VPC"
+  value       = google_compute_network.vpc.self_link
+}
+
 output "subnet_id" {
   description = "ID of the subnet"
   value       = google_compute_subnetwork.subnet.id

@@ -41,6 +41,16 @@ output "wireguard_client_configs" {
   sensitive   = true
 }
 
+# Load Balancer 정보
+output "load_balancer" {
+  description = "Load Balancer information"
+  value = {
+    external_ip = module.load_balancer.load_balancer_ip
+    backend_url = "http://${module.load_balancer.load_balancer_ip}/api"
+    ai_url      = "http://${module.load_balancer.load_balancer_ip}/generation"
+  }
+}
+
 # Ansible 인벤토리를 위한 정보
 output "ansible_inventory" {
   description = "Ansible inventory information"
