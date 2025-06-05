@@ -1,16 +1,225 @@
-# ansible
-ansible/.DS_Store
-ansible/tmp/.DS_Store
-ansible/tmp/*
-ansible/.vault_pass.txt
+# ========================================
+# 14-YG-CLOUD 프로젝트 .gitignore
+# ========================================
 
-# terraform
-terraform/.terraform/*
-terraform/.DS_Store
-terraform/terraform.tfstate
-terraform/terraform.tfstate.backup
-
+# ========================================
+# 시스템 파일
+# ========================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# sql
-ansible/roles/db_fix/files/*
+# ========================================
+# Terraform 관련
+# ========================================
+# Terraform 상태 파일 (민감한 정보 포함)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Terraform 변수 파일 (민감한 정보 포함)
+*.tfvars
+*.tfvars.json
+terraform.tfvars
+terraform.tfvars.backup
+
+# Terraform 캐시 및 임시 파일
+.terraform/
+.terraform.lock.hcl
+*.tfplan
+crash.log
+crash.*.log
+
+# Terraform 모듈 다운로드
+terraform/modules/.terraform/
+terraform/environments/*/.terraform/
+terraform/environments/*/terraform.tfvars
+terraform/environments/*/terraform.tfvars.backup
+
+# ========================================
+# Ansible 관련
+# ========================================
+# Ansible Vault 패스워드 파일
+.vault_pass.txt
+.vault_password
+**/vault_pass.txt
+**/vault_password
+
+# Ansible 임시 파일
+ansible/tmp/*
+ansible/.retry
+*.retry
+
+# Ansible 로그
+ansible.log
+*.log
+
+# Ansible Galaxy 의존성
+roles/*/files/*.rpm
+roles/*/files/*.deb
+galaxy_roles/
+
+# ========================================
+# 보안 관련 파일 (절대 커밋 금지)
+# ========================================
+# GCP 서비스 계정 키
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+service-account*.json
+*-key.json
+gcp-credentials*.json
+
+# SSH 키
+*.pem
+*.key
+id_rsa*
+id_ecdsa*
+id_ed25519*
+*.pub
+!generate-*.sh
+
+# WireGuard 키 및 설정
+**/wireguard-keys/
+wireguard-keys/
+*.conf
+wg*.conf
+**/client-keys.txt
+**/server-keys.txt
+
+# SSL/TLS 인증서
+*.crt
+*.csr
+*.p12
+*.pfx
+
+# 데이터베이스 백업 파일
+*.sql
+*.dump
+*.bak
+
+# ========================================
+# 환경 설정 파일
+# ========================================
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.test
+
+# 설정 파일 백업
+*.conf.backup
+*.ini.backup
+*.yaml.backup
+*.yml.backup
+
+# ========================================
+# 개발 도구 관련
+# ========================================
+# IDE 설정
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ========================================
+# 로그 및 임시 파일
+# ========================================
+# 애플리케이션 로그
+logs/
+*.log
+log/
+temp/
+tmp/
+
+# 백업 파일
+*~
+*.tmp
+*.bak
+*.backup
+*.orig
+
+# ========================================
+# 프로젝트별 제외 파일
+# ========================================
+# Docker 관련
+docker-compose.override.yml
+
+# Kubernetes 시크릿
+*-secret.yaml
+*-secret.yml
+
+# 모니터링 데이터
+prometheus/data/
+grafana/data/
+
+# 데이터베이스 파일
+*.db
+*.sqlite
+*.sqlite3
+
+# ========================================
+# 허용할 파일들 (예외)
+# ========================================
+# 예제 파일들은 허용
+!*.example
+!*.template
+!*-example.*
+!*-template.*
+
+# 문서 파일들은 허용
+!docs/**
+!README.md
+!*.md
+
+# 스크립트 파일들은 허용 (키 생성 제외)
+!scripts/*.sh
+
+# Terraform 예제 파일은 허용
+!terraform.tfvars.example
+
+# ========================================
+# 주의사항
+# ========================================
+# 민감한 정보가 포함된 파일을 실수로 커밋하지 않도록
+# 다음 명령어로 확인하세요:
+# git status --ignored
+# git add . --dry-run
