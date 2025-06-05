@@ -1,0 +1,6 @@
+- name: backend deployment tasks
+  hosts: "{{ target }}"
+  become: yes
+
+  roles:
+    - role: be_deploy

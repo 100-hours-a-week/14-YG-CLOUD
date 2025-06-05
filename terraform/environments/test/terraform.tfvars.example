@@ -1,0 +1,50 @@
+# Test 환경 설정
+
+# 프로젝트 정보
+project_id   = "ktb-2-moongsan"
+project_name = "moongsan"
+env          = "test"
+region       = "asia-northeast3"
+zone         = "asia-northeast3-a"
+
+# 도메인 설정
+domain_name = "test.moongsan.com"
+
+# 네트워크 설정
+subnet_cidr    = "10.0.0.0/24"
+wireguard_cidr = "10.8.0.0/24"
+
+# SSH 설정
+ssh_public_key_path = "~/.ssh/lsh-study-key.pub"
+ssh_source_ranges   = ["0.0.0.0/0"]  # 실제 환경에서는 특정 IP로 제한
+
+# WireGuard 키 설정 (generate-wireguard-keys.sh 실행 후 입력)
+wireguard_private_key = "SERVER_PRIVATE_KEY_HERE"
+wireguard_public_key  = "SERVER_PUBLIC_KEY_HERE"
+
+# WireGuard 클라이언트 설정
+wireguard_clients = [
+  {
+    name        = "backend"
+    address     = "10.8.0.20/32"
+    private_key = "BACKEND_PRIVATE_KEY_HERE"
+    public_key  = "BACKEND_PUBLIC_KEY_HERE"
+  },
+  {
+    name        = "ai"
+    address     = "10.8.0.30/32"
+    private_key = "AI_PRIVATE_KEY_HERE"
+    public_key  = "AI_PUBLIC_KEY_HERE"
+  },
+  {
+    name        = "database"
+    address     = "10.8.0.40/32"
+    private_key = "DATABASE_PRIVATE_KEY_HERE"
+    public_key  = "DATABASE_PUBLIC_KEY_HERE"
+  }
+]
+
+# 스타트업 스크립트 (선택사항)
+backend_startup_script  = ""
+ai_startup_script      = ""
+database_startup_script = ""

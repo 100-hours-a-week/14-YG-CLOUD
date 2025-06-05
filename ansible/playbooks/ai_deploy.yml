@@ -1,0 +1,6 @@
+- name: ai deployment tasks
+  hosts: "{{ target }}"
+  become: yes
+
+  roles:
+    - role: ai_deploy

@@ -1,0 +1,6 @@
+- name: frontend deployment tasks
+  hosts: "{{ target }}"
+  become: yes
+
+  roles:
+    - role: fe_deploy
