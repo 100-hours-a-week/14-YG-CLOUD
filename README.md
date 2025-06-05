@@ -87,17 +87,22 @@ cd ../../ansible
 ansible-playbook -i inventory_test.ini playbooks/site.yml
 ```
 
-### 3. 스크립트 기반 배포 (기존 방식)
+### 3. 필수 유틸리티만 사용 (권장)
 
-> ⚠️ **주의**: 스크립트 기반 배포는 더 이상 권장되지 않습니다. Script-Free 방식을 사용하세요.
+> ✅ **권장**: 복잡한 스크립트 의존성을 제거하고 필요한 유틸리티만 사용합니다.
 
 ```bash
-# 아카이브된 스크립트들 (참고용)
-ls scripts/archive/
-
-# 현재 유지되는 필수 도구들
-./scripts/cleanup-resources.sh test --help
+# WireGuard VPN 키 생성 (최초 1회)
 ./scripts/generate-wireguard-keys.sh
+
+# 리소스 정리 (필요시)
+./scripts/cleanup-resources.sh test --help
+
+# 주요 배포는 순수 Terraform/Ansible 명령어 사용
+cd terraform/environments/test
+terraform init && terraform apply
+cd ../../../ansible  
+ansible-playbook -i inventory_test.ini playbooks/site.yml
 ```
 
 ### 4. 배포 확인
@@ -159,20 +164,26 @@ Admin ──> Jump Box (VPN) ──> Private Network
 
 ### 🔒 보안 관리 및 Git 보호
 
-⚠️ **중요**: 민감한 정보 보호를 위해 [보안 가이드](docs/security-git-guide.md)를 반드시 확인하세요.
+⚠️ **중요**: 민감한 정보 보호를 위해 [보안 가이드](docs/security-git-guide.md)와 [Ansible Vault 가이드](docs/ansible-vault-security-guide.md)를 반드시 확인하세요.
 
 ```bash
-# 커밋 전 보안 체크
-git status
-git status --ignored  # 민감한 파일들이 제외되었는지 확인
+# 민감한 정보 검색 (커밋 전 확인)
+grep -r "AKIA\|sk-" . --exclude-dir=.git --exclude-dir=terraform/.terraform
 
-# 민감한 정보 검색
-grep -r "private_key\|secret\|password" . --exclude-dir=.git
+# Ansible Vault 파일 상태 확인
+cd ansible
+ansible-vault view group_vars/dev/all.yml  # 암호화 상태 확인
 
 # 안전한 설정 파일 생성
 cp terraform/environments/test/terraform.tfvars.example \
    terraform/environments/test/terraform.tfvars
 ```
+
+**보안 강화 사항:**
+- ✅ **Ansible Vault**: 모든 민감 정보 암호화
+- ✅ **Git 보호**: `.gitignore`로 민감 파일 자동 제외
+- ✅ **Vault 변수**: AWS 키, API 키 등 안전한 관리
+- ✅ **암호화된 설정**: 환경별 설정 파일 완전 암호화
 
 **자동으로 제외되는 파일들:**
 - `*.tfvars` (Terraform 변수)
@@ -180,6 +191,8 @@ cp terraform/environments/test/terraform.tfvars.example \
 - `wireguard-keys/` (VPN 키)
 - `.env*` (환경 변수)
 - `*.tfstate*` (Terraform 상태)
+- `.vault_pass.txt` (Ansible Vault 패스워드)
+- 하드코딩된 API 키, AWS 액세스 키 등
 
 ## 📊 모니터링 & 관리
 
