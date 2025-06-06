@@ -55,7 +55,7 @@ resource "google_storage_bucket" "terraform_state" {
   }
   
   lifecycle {
-    prevent_destroy = var.enable_deletion_protection
+    prevent_destroy = false  # Bootstrap 환경에서는 테스트/정리를 위해 false 설정
   }
 }
 
@@ -72,7 +72,7 @@ resource "google_kms_crypto_key" "terraform_state_key" {
   purpose  = "ENCRYPT_DECRYPT"
   
   lifecycle {
-    prevent_destroy = var.enable_deletion_protection
+    prevent_destroy = false  # Bootstrap 환경에서는 테스트/정리를 위해 false 설정
   }
 }
 
