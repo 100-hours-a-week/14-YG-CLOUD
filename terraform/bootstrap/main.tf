@@ -76,6 +76,19 @@ resource "google_kms_crypto_key" "terraform_state_key" {
   }
 }
 
+# Cloud Storage 서비스 계정에 KMS 키 사용 권한 부여
+data "google_storage_project_service_account" "gcs_account" {
+}
+
+resource "google_kms_crypto_key_iam_binding" "terraform_state_key_binding" {
+  crypto_key_id = google_kms_crypto_key.terraform_state_key.id
+  role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+  
+  members = [
+    "serviceAccount:${data.google_storage_project_service_account.gcs_account.email_address}",
+  ]
+}
+
 # 필요한 API들 활성화
 resource "google_project_service" "apis" {
   for_each = toset([
