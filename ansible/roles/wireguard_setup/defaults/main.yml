@@ -1,0 +1,12 @@
+# WireGuard 기본값
+
+wireguard_port: 51820
+wireguard_server_address: "10.8.0.1/24"
+wireguard_interface: "wg0"
+
+# 기본 클라이언트 목록 (환경별 설정에서 오버라이드)
+wireguard_clients: []
+
+# 서버 키 정보 (vault에서 가져옴)
+wireguard_server_private_key: "{{ vault_wireguard_server_private_key | default('') }}"
+wireguard_server_public_key: "{{ vault_wireguard_server_public_key | default('') }}"

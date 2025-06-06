@@ -1,0 +1,44 @@
+# WireGuard 설치 및 설정 태스크
+
+- name: Update system packages
+  apt:
+    update_cache: yes
+  become: yes
+
+- name: Install WireGuard
+  apt:
+    name: wireguard
+    state: present
+  become: yes
+
+- name: Enable IP forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    reload: yes
+  become: yes
+
+- name: Create WireGuard configuration from template
+  template:
+    src: wg0.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    mode: "0600"
+    backup: yes
+  become: yes
+  notify: restart wireguard
+
+- name: Enable and start WireGuard service
+  systemd:
+    name: wg-quick@wg0
+    enabled: yes
+    state: started
+  become: yes
+
+- name: Allow WireGuard port through UFW (if UFW is active)
+  ufw:
+    rule: allow
+    port: "{{ wireguard_port }}"
+    proto: udp
+  become: yes
+  when: ansible_facts['services']['ufw.service'] is defined

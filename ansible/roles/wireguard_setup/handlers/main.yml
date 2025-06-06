@@ -1,0 +1,12 @@
+---
+# WireGuard 핸들러
+
+- name: restart wireguard
+  systemd:
+    name: wg-quick@wg0
+    state: restarted
+  become: yes
+
+- name: reload wireguard
+  shell: wg-quick down wg0 && wg-quick up wg0
+  become: yes
