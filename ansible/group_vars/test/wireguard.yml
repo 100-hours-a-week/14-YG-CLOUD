@@ -1,0 +1,26 @@
+---
+# WireGuard 테스트 환경 설정 변수
+
+# 서버 기본 설정
+wireguard_port: 51820
+wireguard_server_address: "10.8.0.1/24"
+wireguard_interface: "wg0"
+
+# 네트워크 설정
+wireguard_client_network: "10.8.0.0/24"
+wireguard_dns_servers:
+  - "8.8.8.8"
+  - "8.8.4.4"
+
+# 보안 설정
+persistent_keepalive: 25
+allowed_external_ips: "0.0.0.0/0"
+
+# 백업 설정
+backup_enabled: true
+backup_dir: "/var/backups/wireguard"
+backup_retention_days: 30
+
+# 로깅 설정
+wireguard_log_level: "info"
+log_file: "/var/log/wireguard.log"
