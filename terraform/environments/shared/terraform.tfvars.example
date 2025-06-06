@@ -1,0 +1,28 @@
+# GCP 프로젝트 설정
+project_id = "your-gcp-project-id"
+region     = "asia-northeast3"
+zone       = "asia-northeast3-a"
+
+# Jumpbox 설정
+jumpbox_name         = "shared-jumpbox"
+jumpbox_machine_type = "e2-small"
+jumpbox_disk_size    = 20
+jumpbox_image_family = "ubuntu-2204-lts"
+
+# 네트워크 설정
+management_vpc_name = "management-vpc"
+subnet_name         = "management-subnet"
+subnet_cidr         = "10.100.0.0/24"
+
+# 환경별 VPC CIDR (방화벽 규칙용)
+environment_vpc_cidrs = {
+  dev  = "10.0.0.0/16"
+  test = "10.1.0.0/16"
+  prod = "10.2.0.0/16"
+}
+
+# SSH 공개 키 (실제 키로 교체 필요)
+ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQD... your-ssh-public-key"
+
+# 리소스 태그
+tags = ["shared", "management", "jumpbox"]
