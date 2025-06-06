@@ -1,0 +1,40 @@
+# WireGuard 팀원별 키 요약
+생성일: #오후
+서버: 34.64.155.27:51820
+
+=== admin (시스템 관리자) ===
+VPN IP: 10.8.0.10/32
+Private Key: SD+TMP82r+jyB9QnMXTKiQYgFnPqVTa8J/V0wIJtdEE=
+Public Key: Cv5DRqjMhArMrMvUWjIMgJCfpSgW2Dqeh2HoCkdJixo=
+Config File: admin-client.conf
+
+=== lucy (Backend 개발자) ===
+VPN IP: 10.8.0.20/32
+Private Key: AMdfeiGyMcctVGSvxIuCz4V3snJ/Qy/hWPzakGI+plA=
+Public Key: 9kRuTKo6maKLGsmdKAAOTXi/t1YItC4oQ6s1Bsrpkw8=
+Config File: lucy-client.conf
+
+=== kane (Backend 개발자) ===
+VPN IP: 10.8.0.21/32
+Private Key: IAYNKgCp7T8ZT6psWFhyBOpD/CJb+NDhQejamnk3Hm4=
+Public Key: /hGN3IcXutvjcZjSr3Y3vGmPYTXyY1xehjJWIdbiySU=
+Config File: kane-client.conf
+
+=== milo (AI 개발자) ===
+VPN IP: 10.8.0.30/32
+Private Key: QJbHuJ2CkMfuIG+A4XeLm9WUbYx4Ss2zVVqw0ZYV3nY=
+Public Key: SWY+t8np8R+v9v25gHDvrHEHQIWB8joMZqJf8sFj4B0=
+Config File: milo-client.conf
+
+=== tony (AI 개발자) ===
+VPN IP: 10.8.0.31/32
+Private Key: GPmjkFeC3WP9YfpOePzdXk4YQXF+hkrzdGQaKtEBQlI=
+Public Key: DQdOuo+WC6UBMKC7ihe4v2eQ1EwO2wTM1da2L3ZcdmI=
+Config File: tony-client.conf
+
+=== sally (Cloud 엔지니어) ===
+VPN IP: 10.8.0.40/32
+Private Key: MD3v68mhkIeHea/hi8VRSldRQD/s4/OWpuOn2VPZI08=
+Public Key: brP9T7TsDy1aQ7EBQ2y6LKA5a4UGOZKm4PS/mwUjYVo=
+Config File: sally-client.conf
+
