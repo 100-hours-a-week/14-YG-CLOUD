@@ -1,0 +1,35 @@
+# WireGuard 통합 플레이북
+
+- import_playbook: playbooks/wireguard_deploy.yml
+  vars:
+    target: "{{ wireguard_target | default('backend') }}"
+
+- name: Post-deployment verification
+  hosts: "{{ wireguard_target | default('backend') }}"
+  become: yes
+  tasks:
+    - name: Verify WireGuard service is running
+      systemd:
+        name: wg-quick@wg0
+      register: wg_service_status
+
+    - name: Show WireGuard interface status
+      shell: ip addr show wg0
+      register: wg_interface_status
+      failed_when: false
+
+    - name: Display WireGuard network status
+      debug:
+        msg:
+          - "Service Status: {{ wg_service_status.status.ActiveState }}"
+          - "Interface Status: {{ 'UP' if wg_interface_status.rc == 0 else 'DOWN' }}"
+
+    - name: Show connected peers
+      shell: wg show wg0 peers
+      register: wg_peers
+      failed_when: false
+
+    - name: Display connected peers
+      debug:
+        var: wg_peers.stdout_lines
+      when: wg_peers.rc == 0
