@@ -40,11 +40,6 @@ resource "google_storage_bucket" "terraform_state" {
     }
   }
   
-  # KMS 암호화 설정
-  encryption {
-    default_kms_key_name = google_kms_crypto_key.terraform_state_key.id
-  }
-  
   # 공개 액세스 방지
   public_access_prevention = "enforced"
   
