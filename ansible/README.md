@@ -1,162 +1,157 @@
-# 14-YG-CLOUD Ansible Playbook
+# 14-YG-CLOUD Ansible Infrastructure
 
-이 프로젝트는 공동구매 플랫폼(14-YG)의 AI, FE, BE, DB 인프라 구성을 Ansible을 통해 자동화하는 템플릿입니다.
-모든 구성 요소는 Docker 기반으로 배포되며, 일부 시스템 구성(Nginx, DB)은 호스트에서 직접 관리됩니다.
+3-tier 클라우드 인프라를 자동화 배포하기 위한 Ansible 프로젝트입니다.
+AI, 백엔드, 프론트엔드, 데이터베이스를 포함한 완전한 애플리케이션 스택을 환경별로 관리할 수 있습니다.
 
-## 📦 구성 요소
+## 🏗️ 인프라 구성
 
-| 구성 요소          | 설명                                                      |
-|-------------------|-----------------------------------------------------------|
-| **common**        | 서버 공통 환경 구성 (Docker, nginx, certbot 등)                |
-| **nginx_conf**    | Nginx 설정 및 HTTPS 인증서 발급 자동화                          |
-| **be_deploy**        | 백엔드 배포 전용 역할 (레포 클론 → env 생성 → docker compose 실행) |
-| **database**      | MySQL 서버 설치 및 초기 사용자/DB 설정                          |
+### 🎯 지원 환경
+- **개발(dev)**: 개발 및 테스트용 환경
+- **테스트(test)**: QA 및 통합 테스트 환경  
+- **프로덕션(prod)**: 실서비스 환경
+- **공유(shared)**: WireGuard VPN 등 공유 인프라
 
+### 📦 서비스 구성
+| 구성 요소 | 설명 | 배포 방식 |
+|----------|------|-----------|
+| **AI 서비스** | 머신러닝/AI 추론 서버 | Docker 컨테이너 |
+| **백엔드** | REST API 서버 | Docker 컨테이너 |
+| **프론트엔드** | 웹 애플리케이션 | Docker 컨테이너 |
+| **데이터베이스** | MySQL/PostgreSQL | Docker 또는 호스트 설치 |
+| **Redis** | 캐시 및 세션 스토어 | Docker 컨테이너 |
+| **Nginx** | 리버스 프록시 & 로드밸런서 | 호스트 설치 |
+| **WireGuard** | VPN 서버 | 호스트 설치 |
 
-## 📁 프로젝트 구조
+## 📁 디렉토리 구조
 
 ```bash
 ansible/
-├── playbook.yml
-├── inventory.ini
-├── .vault_pass.txt
-├── group_vars/
-│   └── test/
-│       └── all.yml
-├── roles/
-│   ├── common/
-│   ├── nginx_conf/
-│   ├── be_deploy/
-│   └── database/
+├── inventory.ini              # 메인 인벤토리 (dev, prod, shared)
+├── inventory_test.ini         # 테스트 환경 인벤토리
+├── ansible.cfg               # Ansible 설정
+├── wireguard_playbook.yml    # WireGuard 통합 플레이북
+├── group_vars/               # 환경별 변수 설정
+│   ├── all/vault.yml        # 전역 암호화 변수
+│   ├── dev/                 # 개발 환경 설정
+│   │   ├── all.yml
+│   │   └── wireguard.yml
+│   ├── test/                # 테스트 환경 설정
+│   │   ├── all.yml
+│   │   ├── vault.yml
+│   │   └── wireguard.yml
+│   ├── prod/                # 프로덕션 환경 설정
+│   │   ├── all.yml
+│   │   └── wireguard.yml
+│   └── shared/              # 공유 인프라 설정
+│       ├── vault.yml
+│       └── wireguard.yml
+├── playbooks/               # 환경별/목적별 플레이북
+│   ├── deploy_dev.yml       # 개발 환경 전체 배포
+│   ├── deploy_test.yml      # 테스트 환경 전체 배포
+│   ├── deploy_prod.yml      # 프로덕션 환경 전체 배포
+│   ├── deploy_shared.yml    # 공유 인프라 배포
+│   ├── ai_deploy.yml        # AI 서비스 개별 배포
+│   ├── be_deploy.yml        # 백엔드 서비스 개별 배포
+│   ├── fe_deploy.yml        # 프론트엔드 서비스 개별 배포
+│   ├── wireguard_deploy.yml # WireGuard 개별 배포
+│   ├── dev_db_fix.yml       # DB 수정/복구 (개발/테스트)
+│   ├── site.yml            # 범용 전체 배포
+│   └── README.md           # 플레이북 사용 가이드
+├── roles/                   # Ansible 역할 정의
+│   ├── base_system/        # 기본 시스템 설정
+│   ├── common/             # 공통 서비스 (Docker 등)
+│   ├── database/           # 데이터베이스 설정
+│   ├── be_deploy/          # 백엔드 배포
+│   ├── ai_deploy/          # AI 서비스 배포
+│   ├── fe_deploy/          # 프론트엔드 배포
+│   ├── nginx_conf/         # Nginx 설정
+│   ├── wireguard_setup/    # WireGuard VPN 설정
+│   ├── redis/              # Redis 설정
+│   ├── db_backup/          # 백업 설정
+│   └── db_fix/             # DB 수정/복구
+└── templates/              # 설정 파일 템플릿
 ```
 
 
-## 🔐 Vault 암호화
-- 민감한 변수(db_password, jwt_secret 등)는 ansible-vault로 암호화되어 있습니다.
-- 암호 파일: .vault_pass.txt (비공개 저장소에서 관리)
+## 🚀 빠른 시작
 
-**예시 복호화, 암호화 명령:**
+### 1. 환경별 전체 배포 (권장)
+
 ```bash
-# 암호화
-ansible-vault encrypt group_vars/test/all.yml
+# 개발 환경 배포
+ansible-playbook -i inventory.ini playbooks/deploy_dev.yml
 
-# 복호화
-ansible-vault decrypt group_vars/test/all.yml
+# 테스트 환경 배포
+ansible-playbook -i inventory_test.ini playbooks/deploy_test.yml
+
+# 프로덕션 환경 배포 (주의!)
+ansible-playbook -i inventory_prod.ini playbooks/deploy_prod.yml --check  # 드라이런 먼저
+ansible-playbook -i inventory_prod.ini playbooks/deploy_prod.yml
+
+# WireGuard VPN 배포
+ansible-playbook -i inventory.ini playbooks/deploy_shared.yml
 ```
 
-### DockerHub 비밀번호 예시
-
-DockerHub 로그인 시 필요한 비밀번호도 ansible-vault로 암호화하여 다음과 같이 `group_vars/test/all.yml`에 정의합니다.
-
-```yaml
-dockerhub:
-  username: himello
-  password: "{{ vault_dockerhub_password }}"
-```
-
-`vault_dockerhub_password`는 다음 명령어로 생성합니다:
+### 2. 개별 서비스 배포
 
 ```bash
-ansible-vault encrypt_string 'your_dockerhub_password' --name 'vault_dockerhub_password'
+# 백엔드만 배포
+ansible-playbook -i inventory.ini playbooks/be_deploy.yml -e "target=dev"
+
+# AI 서비스만 배포  
+ansible-playbook -i inventory.ini playbooks/ai_deploy.yml -e "target=test"
+
+# WireGuard만 배포
+ansible-playbook -i inventory.ini wireguard_playbook.yml
 ```
 
-`.vault_pass.txt`는 루트 디렉토리에 존재해야 하며, `.gitignore`에 등록해야 합니다.
+### 3. 태그 기반 선택적 배포
 
-`ansible.cfg` 설정 예시:
-
-```ini
-[defaults]
-vault_password_file = .vault_pass.txt
-```
-
-
-## 🚀 사용 방법
-### ⚠️ 운영 환경 배포 시 주의사항
-
-운영 서버(--limit prod)에 --tags fastapi, --tags backend 등을 사용해 직접 배포하는 경우, 다음 사항을 반드시 확인해야 합니다:
-#### dry-run(dry 실행) 습관화
-실행 전 영향 범위를 확인하려면 --check 플래그를 활용하세요:
 ```bash
-ansible-playbook -i inventory.ini playbook.yml \
-  --limit prod --tags fastapi \
-  --extra-vars "tag=v1.0.0" --check
-```
-> 운영 환경에서는 항상 환경 확인 + 태그 명시 + 재확인 + dry-run 후 배포를 습관화하세요.
+# 기본 시스템 설정만
+ansible-playbook -i inventory.ini playbooks/deploy_dev.yml --tags "base"
 
-### 1. 인벤토리 설정
+# 데이터베이스만 배포
+ansible-playbook -i inventory.ini playbooks/deploy_dev.yml --tags "database"
 
-`inventory.ini` 파일에 테스트 및 운영 서버를 정의합니다.
-
-```ini
-[prod]
-moongsan.com ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/lsh-study-key
-
-[test]
-test.moongsan.com ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/lsh-study-key
+# 백엔드 + AI 서비스만
+ansible-playbook -i inventory.ini playbooks/deploy_dev.yml --tags "backend,ai"
 ```
 
-### 2. 태그 전략 및 배포 방식
+## 🔐 보안 설정
 
-Docker 이미지 태그는 v1.*.* 형식을 기준으로 하며, 브랜치/배포 목적에 따라 다음과 같이 지정합니다.
-Ansible에서는 --extra-vars "tag=..." 방식으로 태그를 명시해야 정확한 이미지가 배포됩니다.
+### Ansible Vault 암호화
+민감한 변수(데이터베이스 패스워드, API 키 등)는 Ansible Vault로 암호화되어 있습니다.
+
 ```bash
-# release 브랜치 (QA 서버용, 릴리즈 후보)
-ansible-playbook -i inventory.ini playbook.yml \
-  --limit test --tags fastapi \
-  --extra-vars "tag=rc-1.0.0"
+# 변수 암호화
+ansible-vault encrypt group_vars/test/vault.yml
 
-# main 브랜치 (운영 서버용, 안정 버전)
-ansible-playbook -i inventory.ini playbook.yml \
-  --limit prod --tags fastapi \
-  --extra-vars "tag=v1.0.0"
+# 변수 복호화  
+ansible-vault decrypt group_vars/test/vault.yml
+
+# 문자열 직접 암호화
+ansible-vault encrypt_string 'secret_password' --name 'vault_db_password'
 ```
->💡 tag는 group_vars/[env]/all.yml에서 기본값을 지정할 수 있지만,
-운영 환경에서는 반드시 명시적으로 --extra-vars를 통해 태그를 지정하는 것을 권장합니다
 
----
+### WireGuard VPN 설정
+공유 인프라에 WireGuard VPN 서버를 설정하여 안전한 관리 액세스를 제공합니다.
 
-## 🔐 변수 설정
+**주요 설정**:
+- **서버 주소**: `10.8.0.1/24`
+- **포트**: `51820`
+- **클라이언트**: admin, kane, lucy, milo, sally, tony
+- **설정 파일**: `wireguard-team-keys/` 디렉토리
 
-모든 환경별 변수는 `group_vars/[env]/all.yml` 하나의 파일에서 관리됩니다.  
-서비스 범주별로 중첩된 딕셔너리 구조를 사용하며, Ansible Vault로 민감한 변수는 암호화되어 있습니다.  
-`.vault_pass.txt`를 통해 복호화할 수 있습니다.
+**클라이언트 연결**:
+```bash
+# 클라이언트 설정 파일 확인
+ls -la wireguard-team-keys/
+# admin-client.conf, kane-client.conf, lucy-client.conf, ...
 
-
-### 주요 변수 구조
----
-#### `nginx`
-| 이름 | 설명 |
-|------|------|
-| `nginx.domain` | Nginx 도메인 |
-| `nginx.ssl_email` | 인증서 발급용 이메일 |
----
-#### `DB`
-| 이름 | 설명 |
-|------|------|
-| `db.url`, `db.user`, `db.password` | Spring DB 연결 정보 |
-| `db.root_user`, `db.root_password` | DB 초기화용 root 계정 |
-| `db.name` | 생성할 DB 이름 |
----
-#### `BE`
-| 이름 | 설명 |
-|------|------|
-| `be.ai_service_base_url` | 백엔드에서 참조하는 AI 주소 |
-| `be.ai_service_enabled` | AI 연동 여부 |
-| `be.aws.access_key`, `be.aws.secret_key` | S3 인증 정보 |
-| `be.aws.region` | S3 리전 |
-| `be.aws.s3_bucket` | 버킷명 |
----
-#### `AI`
-| 이름 | 설명 |
-|------|------|
-`ai.openai_api_key` | OpenAI 키
-`ai.gcp.credentials` 등 | GCP 인증 정보 (`client_id`, `private_key`, `project` 등 포함)
-`ai.langsmith.*` | Langsmith 추적 설정 (api_key, project 등)
-`ai.tavily_api_keys.*` | Tavily 사용자별 키
-`ai.proxies[0]`, `ai.proxies[1]` | API 프록시 주소 리스트
----
-#### `FE`
-| 이름 | 설명 |
+# VPN 연결 후 서버 접근 테스트
+ping 10.8.0.1
+```
 |------|------|
 | `fe.image` | 프론트엔드 Docker 이미지 경로 (ex. himello/fe_moongsan) |
 | `fe.tag` | 배포할 Docker 이미지 태그 (기본값: test) |
@@ -255,90 +250,174 @@ docker restart be_moongsan
 - 운영 보안을 위해 `host: '%'`는 지양하고, 실제 사용하는 네트워크 대역만 열어야 합니다.
 
 
+## 📊 환경별 변수 구조
+
+### Group Variables 계층
+```bash
+group_vars/
+├── all/vault.yml              # 전역 공통 암호화 변수
+├── dev/                       # 개발 환경
+│   ├── all.yml               # 개발 환경 설정
+│   └── wireguard.yml         # 개발용 WireGuard 설정
+├── test/                      # 테스트 환경
+│   ├── all.yml               # 테스트 환경 설정
+│   ├── vault.yml             # 테스트 환경 암호화 변수
+│   └── wireguard.yml         # 테스트용 WireGuard 설정
+├── prod/                      # 프로덕션 환경
+│   ├── all.yml               # 프로덕션 환경 설정
+│   └── wireguard.yml         # 프로덕션용 WireGuard 설정
+└── shared/                    # 공유 인프라
+    ├── vault.yml             # 공유 인프라 암호화 변수
+    └── wireguard.yml         # 공유 WireGuard 설정
+```
+
+### 주요 변수 카테고리
+
+#### 🌐 네트워크 및 도메인
+```yaml
+nginx:
+  domain: "example.com"
+  ssl_email: "admin@example.com"
+```
+
+#### 🗄️ 데이터베이스
+```yaml
+database:
+  host: "localhost"
+  port: 3306
+  name: "app_db"
+  user: "app_user" 
+  password: "{{ vault_db_password }}"
+  root_password: "{{ vault_db_root_password }}"
+```
+
+#### ⚙️ 백엔드 서비스
+```yaml
+backend:
+  image_tag: "v1.0.0"
+  port: 8080
+  ai_service_url: "http://ai-service:8000"
+  aws:
+    access_key: "{{ vault_aws_access_key }}"
+    secret_key: "{{ vault_aws_secret_key }}"
+    region: "ap-northeast-2"
+    s3_bucket: "my-app-bucket"
+```
+
+#### 🤖 AI 서비스
+```yaml
+ai:
+  image_tag: "v1.0.0"
+  port: 8000
+  openai_api_key: "{{ vault_openai_api_key }}"
+  gcp:
+    project_id: "my-project"
+    credentials: "{{ vault_gcp_credentials }}"
+```
+
+#### 🔒 WireGuard VPN
+```yaml
+wireguard:
+  interface: "wg0"
+  port: 51820
+  server_address: "10.8.0.1/24"
+  clients:
+    - name: "admin"
+      ip: "10.8.0.2/32"
+    - name: "developer"
+      ip: "10.8.0.3/32"
+```
+
+## 🔧 운영 가이드
+
+### 배포 모범 사례
+
+#### 1. 프로덕션 배포 절차
+```bash
+# 1단계: 드라이런으로 변경사항 확인
+ansible-playbook -i inventory_prod.ini playbooks/deploy_prod.yml --check
+
+# 2단계: 백업 확인
+ansible -i inventory_prod.ini prod -m shell -a "ls -la /var/backup/"
+
+# 3단계: 단계별 배포 (선택적)
+ansible-playbook -i inventory_prod.ini playbooks/deploy_prod.yml --tags "base,database"
+
+# 4단계: 전체 배포
+ansible-playbook -i inventory_prod.ini playbooks/deploy_prod.yml
+```
+
+#### 2. 롤백 절차
+```bash
+# 이전 이미지 태그로 롤백
+ansible-playbook -i inventory_prod.ini playbooks/be_deploy.yml \
+  -e "target=prod" -e "image_tag=v1.0.0-rollback"
+
+# 데이터베이스 롤백 (필요시)
+ansible-playbook -i inventory_prod.ini playbooks/dev_db_fix.yml \
+  -e "target=prod" -e "restore_backup=true"
+```
+
+### 모니터링 및 트러블슈팅
+
+#### 서비스 상태 확인
+```bash
+# 모든 컨테이너 상태
+ansible -i inventory.ini dev -m shell -a "docker ps -a"
+
+# 특정 서비스 로그
+ansible -i inventory.ini dev -m shell -a "docker logs backend-container --tail 100"
+
+# 시스템 리소스 확인
+ansible -i inventory.ini dev -m shell -a "df -h && free -h"
+```
+
+#### WireGuard 연결 확인
+```bash
+# VPN 서버 상태
+ansible -i inventory.ini shared -m shell -a "wg show"
+
+# 클라이언트 연결 테스트
+ping 10.8.0.1  # VPN 연결 후
+```
+
+## 📚 추가 리소스
+
+### 관련 문서
+- [📖 플레이북 사용 가이드](playbooks/README.md)
+- [🔒 보안 가이드](../docs/security-guide.md)
+- [🚀 배포 가이드](../docs/deployment-guide.md)
+- [🔧 트러블슈팅 가이드](../docs/troubleshooting-guide.md)
+
+### 유용한 명령어
+```bash
+# Ansible 구문 검사
+ansible-playbook --syntax-check playbooks/deploy_dev.yml
+
+# 인벤토리 확인
+ansible-inventory -i inventory.ini --list
+
+# 변수 덤프
+ansible -i inventory.ini dev -m setup
+
+# Vault 편집
+ansible-vault edit group_vars/test/vault.yml
+```
+
+## 🏗️ 개발 및 기여
+
+### 새로운 역할 추가
+1. `roles/` 디렉토리에 새 역할 생성
+2. 필요한 디렉토리 구조 생성 (`tasks/`, `templates/`, `defaults/`)
+3. 해당 역할을 플레이북에 추가
+4. 문서 업데이트
+
+### 새로운 환경 추가
+1. `group_vars/new_env/` 디렉토리 생성
+2. 필요한 변수 파일 생성 (`all.yml`, `vault.yml`)
+3. 인벤토리 파일에 새 환경 추가
+4. 환경별 플레이북 생성 (`playbooks/deploy_new_env.yml`)
+
 ---
 
-### 🧱 Step 4. 백엔드 애플리케이션 배포
-
-**📁 역할: `be_deploy`**
-
-- 백엔드 레포지토리(`14-YG-BE`)를 clone 또는 fetch/reset 합니다.
-- `group_vars/test/all.yml`에서 주입되는 변수를 기반으로 `.env.prod` 파일을 생성합니다.
-- Ansible은 Dockerfile을 기반으로 이미지를 pull → run까지 수행합니다.
-- 서비스 로그는 `/logs/be_moongsan.log`에 기록되며, logrotate 설정으로 관리됩니다.
-- 디스크 공간 확보를 위해 빌드 전마다 사용하지 않는 Docker 이미지 및 빌드 캐시를 정리합니다.
-  - `docker image prune -f`
-  - `docker builder prune -f`
-
----
-
-### 🧠 Step 5. AI 서비스 패키지 버전 고정 (임시 수정 내역)
-
-**📁 역할: `ai_deploy`**
-
-- FastAPI 기반 AI 애플리케이션을 `/home/ubuntu/14-YG-AI`에 배치합니다.
-- .env 및 GCP 인증 키 파일을 템플릿으로 자동 생성합니다.
-- 멀티 스테이지 Dockerfile을 활용해 이미지 빌드 및 실행을 자동화하며, 최적화된 대형 패키지를 포함합니다.
-- /generation/description에서 상품 상세 설명을 생성하며, 로그는 /var/moongsan/log/ai_moongsan.log에 기록됩니다.
-- 배포 후 불필요한 이미지/캐시는 자동 정리됩니다.
-
----
-
-### 🧾 Step 6. 프론트엔드 애플리케이션 배포
-
-**📁 역할: `fe_deploy`**
-
-- 프론트엔드 레포지토리(`14-YG-FE`)를 clone 또는 fetch/reset 합니다.
-- `.env` 파일을 템플릿(`vite.env.j2`)으로 생성하여 `VITE_BASE_URL`을 환경에 맞게 자동 주입합니다.
-- `vite.config.ts` 파일 역시 환경에 맞는 proxy 설정을 주입하여 개발 모드에서 API를 연결할 수 있게 합니다.
-- `npm install`, `npm run build`로 정적 빌드 후, `/var/www/react`로 결과물을 복사하여 nginx가 서빙합니다.
-- 로그는 `/logs/fe_moongsan.log`에 기록되며, logrotate 설정으로 관리됩니다.
-- 디스크 공간 확보를 위해 불필요한 node_modules 캐시 및 Docker 빌드 캐시가 정리됩니다.
-  - `rm -rf node_modules/`
-  - `npm cache clean --force`
-
----
-
-### 🗃️ Step 7. DB 백업 자동화 구성
-
-**📁 역할: `db_backup`**
-
-- 백업 스크립트(`db_backup.sh`)는 `/var/script/{{ service_name }}/` 경로에 배치되며, 매일 새벽 3시에 cron으로 자동 실행됩니다.
-- DB 백업은 `mysqldump`를 통해 수행되며, 결과는 `/var/backup/{{ service_name }}/`에 `.sql` 파일로 저장됩니다.
-- 백업 파일명은 `moongsan_{{ env }}_db_YYYY-MM-DD-HH-MM.sql` 형식으로 환경별로 구분됩니다.
-- 생성된 백업 파일은 GCS(`gs://{{ gcs.name }}/{{ env }}/db/`)에 업로드됩니다.
-- 서비스 계정 키(`my-gcs-key.json`)는 Ansible 템플릿으로 자동 생성되며 `/var/secret/{{ service_name }}/`에 위치합니다.
-- 백업 실행 로그는 `/var/log/{{ service_name }}/db_backup.log`에 기록되며, logrotate로 일 1회 순환됩니다.
-
-**📦 생성 예시**
-
-| 경로 | 설명 |
-|------|------|
-| `/var/script/moongsan/db_backup.sh` | cron에서 실행되는 백업 스크립트 |
-| `/var/backup/moongsan/moongsan_test_db_2025-05-27-03-00.sql` | 환경별 백업 파일 |
-| `/var/moongsan/log/db_backup.log` | 로그 파일 |
-| `/var/secret/moongsan/my-gcs-key.json` | GCP 서비스 계정 키 (Vault 템플릿 기반) |
-
-> 💡 환경 정보(`env`), GCS 버킷명(`gcs.name`)은 `group_vars/[env]/all.yml`에서 명시적으로 정의됩니다.
-
----
-
-## 🌐 접근 URL
-
-| 서비스        | 예시 도메인                |
-|---------------|-----------------------------|
-| Frontend      | https://moongsan.com        |
-| Backend API   | https://moongsan.com/api    |
-| AI API        | https://moongsan.com/generation      |
-| Grafana       | https://grafana.moongsan.com |
-
-## ⚙️ 기타 관리 방법
-
-| 작업 항목                              | 방법                                                                 |
-|----------------------------------------|----------------------------------------------------------------------|
-
-## 📌 참고
-- 모든 서비스는 /home/ubuntu/envs/{{ group }} 경로에 .env 파일이 생성됩니다.
-- 로그는 /home/ubuntu/logs/ 아래로 분리되며, logrotate로 주기적 순환됩니다.
-- 모든 실행은 docker run 기반이며, docker-compose는 사용하지 않습니다.
-- 인증서는 Certbot으로 1회 발급 후 nginx reload로 자동 적용됩니다.
-- DB는 컨테이너 외부 설치 구조로 유지되고, database 역할에서 전담합니다.
+*이 README는 Ansible 인프라의 전체적인 이해를 돕기 위해 작성되었습니다. 자세한 사용법은 각 디렉토리의 README 파일을 참고하세요.*
