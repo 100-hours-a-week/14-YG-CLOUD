@@ -1,0 +1,22 @@
+# WireGuard 공유 인프라 설정
+wireguard:
+  # 서버 기본 설정
+  port: 51820
+  interface: "wg0"
+  network: "10.8.0.0/24"
+  server_address: "10.8.0.1/24"
+  dns: "8.8.8.8, 8.8.4.4"
+
+  # 보안 설정 (vault에서 로드)
+  server_private_key: "{{ vault_wireguard_server_private_key }}"
+  server_public_key: "{{ vault_wireguard_server_public_key }}"
+
+  # 환경별 허용 네트워크 (관리 VPC를 통한 접근)
+  allowed_networks:
+    - "10.100.0.0/24" # 관리 VPC
+    - "10.0.0.0/16" # dev 환경
+    - "10.1.0.0/16" # test 환경
+    - "10.2.0.0/16" # prod 환경
+
+  # 클라이언트 피어 설정
+  clients: "{{ vault_wireguard_clients }}"
