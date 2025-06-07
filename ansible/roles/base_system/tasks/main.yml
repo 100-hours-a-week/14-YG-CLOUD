@@ -1,4 +1,3 @@
----
 # Base system setup role for all VMs
 
 - name: Update system packages
