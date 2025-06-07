@@ -1,4 +1,3 @@
----
 # WireGuard 서버 설정
 wireguard_server_private_key: "{{ vault_wireguard_server_private_key }}"
 wireguard_port: 51820
@@ -11,10 +10,10 @@ wireguard_dns: "8.8.8.8, 8.8.4.4"
 
 # 환경별 허용 네트워크 (관리 VPC를 통한 접근)
 allowed_networks:
-  - "10.100.0.0/24"  # 관리 VPC
-  - "10.0.0.0/16"    # dev 환경
-  - "10.1.0.0/16"    # test 환경  
-  - "10.2.0.0/16"    # prod 환경
+  - "10.100.0.0/24" # 관리 VPC
+  - "10.0.0.0/16" # dev 환경
+  - "10.1.0.0/16" # test 환경
+  - "10.2.0.0/16" # prod 환경
 
 # 클라이언트 피어 설정
 wireguard_clients: "{{ vault_wireguard_clients }}"
