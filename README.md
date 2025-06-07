@@ -1,62 +1,205 @@
-# 🚀 14-YG-CLOUD - 3-Tier 아키텍처
+# 🏗️ 14-YG-CLOUD
 
-> **체계적인 5개 문서**로 모든 것을 관리하는 클라우드 인프라 프로젝트
+> **GCP에서 구현한 최적화된 3-Tier 클라우드 인프라** - 비용 효율성과 보안을 동시에 달성
 
-## 🏗️ 프로젝트 개요
+## 🎯 프로젝트 개요
 
-단일 VM 개발 환경에서 **최적화된 3-Tier 아키텍처로 마이그레이션**하여 **18% 비용 절약($227.77/월)**과 확장성, 보안성을 극대화한 클라우드 인프라입니다.
+단일 VM에서 **3-Tier 아키텍처로 마이그레이션**하여 **18% 비용 절약**과 확장성, 보안성을 확보한 엔터프라이즈급 클라우드 인프라
 
-### 📊 최적화 결과
-- ✅ **비용 절약**: 18% 절감 ($277.99 → $227.77/월)
-- ✅ **성능 향상**: 3-Tier 분리로 확장성 극대화
-- ✅ **보안 강화**: WireGuard VPN + Private 네트워크
-- ✅ **운영 효율**: IaC + 자동화로 배포 시간 47% 단축
+### 📊 달성 결과
+- ✅ **18% 비용 절감**: $277.99 → $227.77/월
+- ✅ **보안 강화**: Private Network + VPN 접근
+- ✅ **확장성 확보**: 계층별 독립적 스케일링
+- ✅ **운영 자동화**: IaC + Configuration Management
 
-### 🎯 아키텍처 특징
-- **Frontend**: GCS + CDN으로 정적 웹 호스팅
-- **Backend**: Private VM에서 Spring Boot API 서버
-- **AI Service**: Private VM에서 FastAPI 기반 AI 서비스  
-- **Database**: Private VM에서 MySQL 데이터베이스
-- **VPN**: WireGuard로 안전한 내부 통신
-- **IaC**: Terraform 모듈화로 재사용성 극대화
-- **자동화**: Ansible로 배포 자동화
+### 🏗️ 현재 아키텍처
+```
+Internet
+  │
+  ▼
+🌐 Load Balancer (Global)
+  │  ├── /api/* → Backend API (8080)
+  │  └── /generation/* → AI Service (8100)
+  │
+  ▼
+🔒 Private VPC (10.0.0.0/16)
+  │
+  ├── 📱 Frontend: GCS + CDN
+  ├── 🖥️ Jump Box: VPN Gateway (e2-small)
+  ├── ⚙️ Backend API: Spring Boot (e2-standard-2)
+  ├── 🤖 AI Service: FastAPI (e2-highmem-2)
+  └── 🗄️ Database: MySQL + Redis (e2-standard-2)
+```
 
-## 📚 핵심 문서 (5개 고정 구조)
+### 💰 비용 구조
+| 구성요소 | 사양 | 월 비용 |
+|----------|------|---------|
+| Jump Box | e2-small (0.5 vCPU, 2GB) | $13.84 |
+| Backend API | e2-standard-2 (2 vCPU, 8GB) | $53.54 |
+| AI Service | e2-highmem-2 (2 vCPU, 16GB) | $80.96 |
+| Database | e2-standard-2 (2 vCPU, 8GB) | $53.54 |
+| 디스크 & 네트워크 | - | $25.89 |
+| **총 비용** | - | **$227.77/월** |
 
-> **모든 정보는 5개 문서로 완결됩니다** - 더 이상 문서가 늘어나지 않습니다
+## 🚀 빠른 시작
 
-### 📋 [`docs/README.md`](docs/README.md) 
-**문서 인덱스 및 프로젝트 가이드** - 전체 문서 구조와 빠른 접근 방법
+### 📋 사전 요구사항
+- GCP 프로젝트 및 권한
+- Terraform >= 1.0
+- Ansible >= 2.9
+- WireGuard VPN 클라이언트
 
-### 🏗️ [`docs/infrastructure-complete-guide.md`](docs/infrastructure-complete-guide.md) 
-**인프라 완전 가이드** - 아키텍처 설계부터 최적화 결과까지 모든 것
-- Part 1: 아키텍처 설계 (3-Tier 구조, 네트워크 설계)
-- Part 2: 최적화 여정 (Jump Box, AI 서버, 로드밸런서, 디스크 최적화)
-- Part 3: 최종 결과 (18% 비용 절약, $227.77/월)
-- Part 4: 현재 아키텍처 상태 (완성된 시스템 상세)
+### ⚡ 5분 배포
+```bash
+# 1. 저장소 클론
+git clone <repository-url>
+cd 14-YG-CLOUD
 
-### 🔧 [`docs/deployment-guide.md`](docs/deployment-guide.md) 
-**배포 가이드** - 순수 Terraform/Ansible 명령어로 투명한 배포
-- Bootstrap 리소스 생성
-- 환경별 인프라 배포  
-- 애플리케이션 배포
-- WireGuard VPN 설정
+# 2. Bootstrap 리소스 생성
+cd terraform/bootstrap
+terraform init && terraform apply
 
-### 🔐 [`docs/security-guide.md`](docs/security-guide.md) 
-**통합 보안 가이드** - 모든 보안 설정을 한 곳에
-- Part 1: Git 보안 (민감한 정보 보호)
-- Part 2: Ansible Vault 보안 (암호화된 설정 관리)
-- Part 3: WireGuard VPN 설정 (안전한 네트워크 접근)
-- Part 4: 종합 보안 체크리스트
+# 3. Test 환경 배포
+cd ../environments/test
+terraform init && terraform apply
 
-### 🔧 [`docs/troubleshooting-guide.md`](docs/troubleshooting-guide.md) 
-**문제해결 가이드** - 모든 문제상황과 해결방법
-- Terraform 문제해결
-- Ansible 문제해결  
-- WireGuard VPN 문제해결
-- GCP 리소스 문제해결
-- 네트워크 연결 문제해결
-- 긴급 상황 대응
+# 4. 애플리케이션 배포
+cd ../../ansible
+ansible-playbook -i inventories/test.ini main.yml -e "env=test"
+```
+
+### 🔍 상태 확인
+```bash
+# 인프라 상태
+gcloud compute instances list
+
+# 서비스 상태
+curl -s http://your-domain.com/api/health
+curl -s http://your-domain.com/generation/health
+```
+
+## 📚 문서 구조
+
+### 🚀 **운영 중심 문서**
+
+
+#### [`docs/README.md`](docs/README.md) 📖
+**프로젝트 개요 및 문서 네비게이션** - 시작점
+
+#### [`docs/operations-guide.md`](docs/operations-guide.md) ⭐
+**일상 운영 가이드** - 시스템 운영의 모든 것
+
+#### [`docs/infrastructure-architecture.md`](docs/infrastructure-architecture.md) 🏗️
+**시스템 아키텍처** - 현재 구조와 동작 원리
+
+### 🔧 **배포 및 관리 문서**
+
+#### [`docs/deployment-guide.md`](docs/deployment-guide.md)
+**배포 실행 가이드** - 환경 구축 및 배포 절차
+
+#### [`docs/security-guide.md`](docs/security-guide.md)
+**보안 설정 가이드** - VPN, 인증, 방화벽 설정
+
+### 📚 **참고 및 히스토리**
+
+#### [`docs/infrastructure-complete-guide.md`](docs/infrastructure-complete-guide.md)
+**인프라 히스토리** - 설계 과정과 최적화 여정
+
+#### [`docs/troubleshooting-guide.md`](docs/troubleshooting-guide.md)
+**문제해결 레퍼런스** - 상황별 해결 방법
+
+## 📁 프로젝트 구조
+
+```
+14-YG-CLOUD/
+├── 📚 docs/                 # 모든 문서 (구조화됨)
+├── 🏗️ terraform/            # 인프라 as Code
+│   ├── bootstrap/          # 초기 리소스
+│   ├── modules/            # 재사용 모듈
+│   └── environments/       # 환경별 설정
+├── ⚙️ ansible/              # 설정 관리
+│   ├── inventories/        # 환경별 인벤토리
+│   ├── playbooks/         # 작업 스크립트
+│   └── roles/             # 역할별 설정
+└── 🛠️ scripts/              # 유틸리티 도구
+```
+
+## 🎯 역할별 가이드
+
+| 역할 | 시작 문서 | 주요 작업 |
+|------|-----------|----------|
+| **시스템 운영자** | [operations-guide.md](docs/operations-guide.md) | 모니터링, 백업, 장애 대응 |
+| **개발자/배포자** | [deployment-guide.md](docs/deployment-guide.md) | 코드 배포, 환경 설정 |
+| **인프라 관리자** | [infrastructure-architecture.md](docs/infrastructure-architecture.md) | 아키텍처 이해, 확장 계획 |
+| **보안 관리자** | [security-guide.md](docs/security-guide.md) | 보안 설정, VPN 관리 |
+
+## 🔧 주요 명령어
+
+### 일상 운영
+```bash
+# 시스템 상태 확인
+gcloud compute instances list
+curl -s http://your-domain.com/api/health
+
+# VPN 연결
+sudo wg-quick up wg0
+
+# 서비스 재시작
+ansible -i inventories/test.ini backend -m service -a "name=backend-api state=restarted"
+```
+
+### 배포 작업
+```bash
+# 인프라 변경
+cd terraform/environments/test
+terraform plan && terraform apply
+
+# 애플리케이션 배포
+cd ../../ansible
+ansible-playbook -i inventories/test.ini main.yml -e "env=test"
+```
+
+### 모니터링
+```bash
+# 리소스 사용량
+ansible -i inventories/test.ini all -m shell -a "free -h && df -h"
+
+# 로그 확인
+ansible -i inventories/test.ini backend -m shell -a "journalctl -u backend-api -n 20"
+```
+
+## 🎁 주요 특징
+
+### ✅ **운영 효율성**
+- **원클릭 배포**: Ansible Playbook으로 모든 서비스 배포
+- **환경 일관성**: Dev, Test, Prod 환경 설정 통일
+- **자동화**: 백업, 모니터링, 배포 자동화
+
+### 🔒 **엔터프라이즈 보안**
+- **Zero Trust**: 모든 서버가 Private Network
+- **VPN 게이트웨이**: WireGuard 기반 안전한 접근
+- **암호화**: Ansible Vault로 모든 민감정보 암호화
+
+### 💰 **비용 최적화**
+- **Right-sizing**: 워크로드별 최적 사양 선택
+- **Frontend 분리**: GCS + CDN으로 VM 비용 절약
+- **리소스 효율**: 18% 비용 절감 달성
+
+### 📈 **확장 가능성**
+- **모듈화**: Terraform 모듈로 재사용성 극대화
+- **마이크로서비스 준비**: 계층별 독립적 스케일링
+- **로드밸런서**: 트래픽 증가에 대응 가능
+
+## 📞 지원
+
+- **일반 문의**: [docs/README.md](docs/README.md)
+- **운영 문제**: [docs/operations-guide.md](docs/operations-guide.md)
+- **기술 문제**: [docs/troubleshooting-guide.md](docs/troubleshooting-guide.md)
+- **보안 이슈**: [docs/security-guide.md](docs/security-guide.md)
+
+---
+
+*이 프로젝트는 실제 운영 환경에서 검증된 최적화된 3-Tier 아키텍처입니다.*
 
 ## 🚀 빠른 시작
 
