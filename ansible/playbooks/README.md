@@ -114,12 +114,12 @@ ansible-playbook -i inventories/prod.ini playbooks/main.yml -e "env=prod" --tags
 
 ```bash
 # BEFORE
-ansible-playbook -i inventory.ini playbooks/deploy_dev.yml
+ansible-playbook -i inventories/dev.ini playbooks/deploy_dev.yml
 # AFTER  
 ansible-playbook -i inventories/dev.ini playbooks/main.yml -e "env=dev"
 
 # BEFORE
-ansible-playbook -i inventory.ini playbooks/be_deploy.yml -e "target=dev"  
+ansible-playbook -i inventories/dev.ini playbooks/be_deploy.yml -e "target=dev"  
 # AFTER
 ansible-playbook -i inventories/dev.ini playbooks/main.yml -e "env=dev" --tags "backend"
 ```

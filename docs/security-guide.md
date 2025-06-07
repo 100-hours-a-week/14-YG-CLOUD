@@ -168,14 +168,14 @@ vault_gcp_project_id: "your-project-id"
 
 ```bash
 # 패스워드 파일 사용
-ansible-playbook -i inventory_test.ini playbooks/site.yml --vault-password-file .vault_pass.txt
+ansible-playbook -i inventories/test.ini main.yml -e "env=test" --vault-password-file .vault_pass.txt
 
 # 패스워드 프롬프트
-ansible-playbook -i inventory_test.ini playbooks/site.yml --ask-vault-pass
+ansible-playbook -i inventories/test.ini main.yml -e "env=test" --ask-vault-pass
 
 # 환경 변수 사용
 export ANSIBLE_VAULT_PASSWORD_FILE=.vault_pass.txt
-ansible-playbook -i inventory_test.ini playbooks/site.yml
+ansible-playbook -i inventories/test.ini main.yml -e "env=test"
 ```
 
 ---

@@ -159,10 +159,10 @@ Terraform 출력값을 사용하여 Ansible 인벤토리를 업데이트:
 ```bash
 # 인벤토리 파일 편집
 cd ../../../ansible
-vim inventory_test.ini
+vim inventories/test.ini
 ```
 
-`inventory_test.ini` 예시:
+`inventories/test.ini` 예시:
 ```ini
 [backend]
 backend-test ansible_host=34.64.123.45 ansible_user=moongsan
@@ -182,16 +182,16 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 
 ```bash
 # 연결 테스트
-ansible all -i inventory_test.ini -m ping
+ansible all -i inventories/test.ini -m ping
 
-# 전체 배포 실행
-ansible-playbook -i inventory_test.ini playbooks/site.yml
+# 전체 배포 실행 - 통합된 main.yml 사용
+ansible-playbook -i inventories/test.ini main.yml -e "env=test"
 
 # 특정 태그만 실행 (예: 데이터베이스만)
-ansible-playbook -i inventory_test.ini playbooks/site.yml --tags database
+ansible-playbook -i inventories/test.ini main.yml -e "env=test" --tags database
 
 # 특정 서버만 대상 (예: Backend만)
-ansible-playbook -i inventory_test.ini playbooks/site.yml --limit backend
+ansible-playbook -i inventories/test.ini main.yml -e "env=test" --limit backend
 ```
 
 ## 4단계: WireGuard 설정
@@ -282,7 +282,7 @@ terraform refresh
 ### Ansible 연결 문제
 ```bash
 # SSH 연결 디버깅
-ansible all -i inventory_test.ini -m ping -vvv
+ansible all -i inventories/test.ini -m ping -vvv
 
 # 특정 호스트 연결 테스트
 ssh -i ~/.ssh/gcp-key moongsan@34.64.123.45

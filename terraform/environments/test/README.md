@@ -96,7 +96,7 @@ cd ../../../scripts
 ### 5. Backend 배포 (Ansible)
 ```bash
 cd ansible
-ansible-playbook -i inventory.ini playbooks/site.yml --limit test
+ansible-playbook -i inventories/test.ini main.yml -e "env=test"
 ```
 
 ## 💰 비용 최적화
@@ -128,7 +128,7 @@ ansible-playbook -i inventory.ini playbooks/site.yml --limit test
 # Ansible을 통한 Rolling Deployment
 - name: Deploy Backend
   run: |
-    ansible-playbook -i inventory.ini playbooks/be_deploy.yml
+    ansible-playbook -i inventories/test.ini main.yml -e "env=test" --tags "backend"
 ```
 
 ## 🛡️ 보안 강화
