@@ -1,6 +1,45 @@
-- name: backend deployment tasks
-  hosts: "{{ target }}"
+# 백엔드 서비스 개별 배포 플레이북
+#
+# 사용법:
+#   ansible-playbook -i inventory.ini playbooks/be_deploy.yml -e "target=dev"
+#   ansible-playbook -i inventory_test.ini playbooks/be_deploy.yml -e "target=test"
+#   ansible-playbook -i inventory_prod.ini playbooks/be_deploy.yml -e "target=prod"
+#
+# 매개변수:
+#   - target: 배포 대상 그룹 (dev, test, prod)
+
+- name: "⚙️ 백엔드 서비스 배포"
+  hosts: "{{ target | default('backend') }}"
   become: yes
+
+  pre_tasks:
+    - name: 배포 대상 확인
+      debug:
+        msg:
+          - "🎯 배포 대상: {{ target | default('backend') }}"
+          - "📅 배포 시간: {{ ansible_date_time.iso8601 }}"
+
+    - name: Docker 서비스 상태 확인
+      systemd:
+        name: docker
+      register: docker_status
+
+    - name: Docker 서비스 실행 확인
+      fail:
+        msg: "Docker 서비스가 실행되지 않았습니다"
+      when: docker_status.status.ActiveState != "active"
 
   roles:
     - role: be_deploy
+
+  post_tasks:
+    - name: 백엔드 서비스 컨테이너 상태 확인
+      shell: "docker ps --filter 'name=backend' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
+      register: be_containers
+
+    - name: 백엔드 서비스 배포 결과
+      debug:
+        msg:
+          - "✅ 백엔드 서비스 배포 완료"
+          - "📊 실행 중인 컨테이너:"
+        var: be_containers.stdout_lines
