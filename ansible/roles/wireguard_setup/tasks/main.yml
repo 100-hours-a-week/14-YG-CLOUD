@@ -38,7 +38,7 @@
 - name: Allow WireGuard port through UFW (if UFW is active)
   ufw:
     rule: allow
-    port: "{{ wireguard_port }}"
+    port: "{{ wireguard.port }}"
     proto: udp
   become: yes
   when: ansible_facts['services']['ufw.service'] is defined

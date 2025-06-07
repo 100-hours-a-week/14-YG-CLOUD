@@ -1,11 +1,11 @@
 [Interface]
-Address = {{ wireguard_server_address }}
-PrivateKey = {{ wireguard_server_private_key }}
-ListenPort = {{ wireguard_port }}
-PostUp = iptables -A FORWARD -i {{ wireguard_interface }} -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-PostDown = iptables -D FORWARD -i {{ wireguard_interface }} -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+Address = {{ wireguard.server_address }}
+PrivateKey = {{ wireguard.server_private_key }}
+ListenPort = {{ wireguard.port }}
+PostUp = iptables -A FORWARD -i {{ wireguard.interface }} -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i {{ wireguard.interface }} -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
 
-{% for client in wireguard_clients %}
+{% for client in wireguard.clients %}
 # {{ client.name }}
 [Peer]
 PublicKey = {{ client.public_key }}
