@@ -1,0 +1,252 @@
+---
+# 통합 3-tier 클라우드 인프라 배포 플레이북
+# 모든 환경(dev/test/prod)과 서비스를 지원하는 단일 플레이북
+
+- name: "🚀 3-Tier 클라우드 인프라 통합 배포"
+  hosts: "{{ deploy_env }}"
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    deploy_env: "{{ env | default('dev') }}"
+    
+  pre_tasks:
+    - name: "🔍 환경 검증"
+      block:
+        - name: "환경 변수 확인"
+          fail:
+            msg: "'env' 변수가 설정되지 않았습니다. -e 'env=dev/test/prod' 옵션을 사용하세요."
+          when: env is not defined
+          
+        - name: "지원되는 환경 확인"
+          fail:
+            msg: "지원되지 않는 환경: {{ env }}. dev, test, prod 중 하나를 선택하세요."
+          when: env not in ['dev', 'test', 'prod']
+          
+        - name: "프로덕션 배포 확인"
+          pause:
+            prompt: "⚠️  프로덕션 환경에 배포하시겠습니까? 계속하려면 'yes'를 입력하세요"
+          when: env == 'prod'
+          register: prod_confirm
+          
+        - name: "프로덕션 배포 승인 확인"
+          fail:
+            msg: "프로덕션 배포가 취소되었습니다."
+          when: 
+            - env == 'prod'
+            - prod_confirm.user_input | default('') != 'yes'
+            
+        - name: "📊 배포 시작 정보"
+          debug:
+            msg: |
+              ==========================================
+              🚀 3-Tier 인프라 배포 시작
+              환경: {{ env }}
+              대상 호스트: {{ deploy_env }}
+              시작 시간: {{ ansible_date_time.iso8601 }}
+              ==========================================
+      tags: always
+
+  tasks:
+    # 1단계: 기본 시스템 설정
+    - name: "1️⃣ 기본 시스템 설정 (1/10)"
+      include_role:
+        name: base_system
+      tags: [base, always]
+      
+    - name: "📈 진행률: 10% 완료 - 기본 시스템 설정 완료"
+      debug:
+        msg: "✅ 기본 시스템 설정이 완료되었습니다."
+      tags: [base, always]
+
+    # 2단계: 공통 설정
+    - name: "2️⃣ 공통 설정 적용 (2/10)"
+      include_role:
+        name: common
+      tags: [base, network, always]
+      
+    - name: "📈 진행률: 20% 완료 - 공통 설정 완료"
+      debug:
+        msg: "✅ 네트워크 및 공통 설정이 완료되었습니다."
+      tags: [base, network, always]
+
+    # 3단계: 데이터베이스 설정
+    - name: "3️⃣ 데이터베이스 설정 (3/10)"
+      include_role:
+        name: database
+      when: "'database' in group_names or 'all' in group_names"
+      tags: [database]
+      
+    - name: "📈 진행률: 30% 완료 - 데이터베이스 설정 완료"
+      debug:
+        msg: "✅ PostgreSQL 데이터베이스 설정이 완료되었습니다."
+      when: "'database' in group_names or 'all' in group_names"
+      tags: [database]
+
+    # 4단계: Redis 설정  
+    - name: "4️⃣ Redis 캐시 설정 (4/10)"
+      include_role:
+        name: redis
+      when: "'redis' in group_names or 'all' in group_names"
+      tags: [database, cache]
+      
+    - name: "📈 진행률: 40% 완료 - Redis 설정 완료"
+      debug:
+        msg: "✅ Redis 캐시 서버 설정이 완료되었습니다."
+      when: "'redis' in group_names or 'all' in group_names"
+      tags: [database, cache]
+
+    # 5단계: 백엔드 서비스 배포
+    - name: "5️⃣ 백엔드 서비스 배포 (5/10)"
+      include_role:
+        name: be_deploy
+      vars:
+        target: "{{ env }}"
+        branch: "{{ branch | default('main') }}"
+      when: "'backend' in group_names or 'all' in group_names"
+      tags: [backend]
+      
+    - name: "📈 진행률: 50% 완료 - 백엔드 서비스 배포 완료"
+      debug:
+        msg: "✅ 백엔드 API 서비스 배포가 완료되었습니다."
+      when: "'backend' in group_names or 'all' in group_names"
+      tags: [backend]
+
+    # 6단계: AI 서비스 배포
+    - name: "6️⃣ AI 서비스 배포 (6/10)"
+      include_role:
+        name: ai_deploy
+      vars:
+        target: "{{ env }}"
+        branch: "{{ branch | default('main') }}"
+      when: "'ai' in group_names or 'backend' in group_names or 'all' in group_names"
+      tags: [ai, backend]
+      
+    - name: "📈 진행률: 60% 완료 - AI 서비스 배포 완료"
+      debug:
+        msg: "✅ AI 머신러닝 서비스 배포가 완료되었습니다."
+      when: "'ai' in group_names or 'backend' in group_names or 'all' in group_names"
+      tags: [ai, backend]
+
+    # 7단계: 프론트엔드 배포
+    - name: "7️⃣ 프론트엔드 배포 (7/10)"
+      include_role:
+        name: fe_deploy
+      vars:
+        target: "{{ env }}"
+        branch: "{{ branch | default('main') }}"
+      when: "'frontend' in group_names or 'all' in group_names"
+      tags: [frontend]
+      
+    - name: "📈 진행률: 70% 완료 - 프론트엔드 배포 완료"
+      debug:
+        msg: "✅ 프론트엔드 웹 애플리케이션 배포가 완료되었습니다."
+      when: "'frontend' in group_names or 'all' in group_names"
+      tags: [frontend]
+
+    # 8단계: Nginx 웹서버 설정
+    - name: "8️⃣ Nginx 웹서버 설정 (8/10)"
+      include_role:
+        name: nginx_conf
+      when: "'nginx' in group_names or 'frontend' in group_names or 'all' in group_names"
+      tags: [nginx, frontend]
+      
+    - name: "📈 진행률: 80% 완료 - Nginx 설정 완료"
+      debug:
+        msg: "✅ Nginx 웹서버 및 SSL 설정이 완료되었습니다."
+      when: "'nginx' in group_names or 'frontend' in group_names or 'all' in group_names"
+      tags: [nginx, frontend]
+
+    # 9단계: 백업 시스템 설정
+    - name: "9️⃣ 백업 시스템 설정 (9/10)"
+      include_role:
+        name: db_backup
+      when: "'database' in group_names or 'all' in group_names"
+      tags: [backup, database]
+      
+    - name: "📈 진행률: 90% 완료 - 백업 시스템 설정 완료"
+      debug:
+        msg: "✅ 자동 백업 시스템 설정이 완료되었습니다."
+      when: "'database' in group_names or 'all' in group_names"
+      tags: [backup, database]
+
+    # 10단계: 모니터링 설정
+    - name: "🔟 모니터링 시스템 설정 (10/10)"
+      include_role:
+        name: monitoring
+      when: "'monitoring' in group_names or 'all' in group_names"
+      tags: [monitoring]
+      
+    - name: "📈 진행률: 100% 완료 - 모니터링 설정 완료"
+      debug:
+        msg: "✅ 시스템 모니터링 설정이 완료되었습니다."
+      when: "'monitoring' in group_names or 'all' in group_names"
+      tags: [monitoring]
+
+  post_tasks:
+    - name: "🎉 배포 완료 보고서"
+      debug:
+        msg: |
+          ==========================================
+          🎉 3-Tier 인프라 배포 완료!
+          
+          환경: {{ env }}
+          완료 시간: {{ ansible_date_time.iso8601 }}
+          
+          📊 배포된 서비스:
+          {% if 'database' in group_names or 'all' in group_names %}
+          ✅ 데이터베이스 (PostgreSQL + Redis)
+          {% endif %}
+          {% if 'backend' in group_names or 'all' in group_names %}
+          ✅ 백엔드 API 서비스
+          {% endif %}
+          {% if 'ai' in group_names or 'backend' in group_names or 'all' in group_names %}
+          ✅ AI 머신러닝 서비스
+          {% endif %}
+          {% if 'frontend' in group_names or 'all' in group_names %}
+          ✅ 프론트엔드 웹 애플리케이션
+          {% endif %}
+          {% if 'nginx' in group_names or 'frontend' in group_names or 'all' in group_names %}
+          ✅ Nginx 웹서버 + SSL
+          {% endif %}
+          {% if 'monitoring' in group_names or 'all' in group_names %}
+          ✅ 모니터링 시스템
+          {% endif %}
+          
+          🔗 다음 단계:
+          1. 서비스 상태 확인: systemctl status <service>
+          2. 로그 확인: journalctl -u <service> -f
+          3. 웹 접속 테스트: https://your-domain.com
+          
+          ==========================================
+      tags: always
+
+    - name: "🔍 시스템 상태 점검"
+      block:
+        - name: "서비스 상태 확인"
+          systemd:
+            name: "{{ item }}"
+            state: started
+            enabled: yes
+          loop:
+            - nginx
+            - postgresql
+          ignore_errors: yes
+          register: service_status
+          
+        - name: "디스크 사용량 확인"
+          shell: df -h / | tail -1 | awk '{print $5}'
+          register: disk_usage
+          
+        - name: "메모리 사용량 확인"
+          shell: free -m | awk 'NR==2{printf "%.2f%%", $3*100/$2}'
+          register: memory_usage
+          
+        - name: "시스템 리소스 보고"
+          debug:
+            msg: |
+              📊 시스템 리소스 상태:
+              💾 디스크 사용량: {{ disk_usage.stdout }}
+              🧠 메모리 사용량: {{ memory_usage.stdout }}
+              ⚡ 서비스 상태: {{ 'OK' if service_status.failed == false else 'WARNING' }}
+      tags: always
