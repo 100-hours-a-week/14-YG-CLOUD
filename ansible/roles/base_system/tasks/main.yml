@@ -89,7 +89,9 @@
     name: docker.io
     state: present
   become: yes
-  when: "'backend' in group_names or 'ai' in group_names"
+  when:
+    - "'backend' in group_names or 'ai' in group_names"
+    - docker_check.rc != 0
 
 - name: Start and enable Docker for backend and AI servers
   systemd:
@@ -101,7 +103,7 @@
 
 - name: Add ubuntu user to docker group for backend and AI servers
   user:
-    name: ubuntu
+    name: "{{ system.user }}"
     groups: docker
     append: yes
   become: yes

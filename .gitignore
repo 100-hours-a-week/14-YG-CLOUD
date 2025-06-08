@@ -214,7 +214,6 @@ terraform/environments/*/secrets.tfvars
 
 # Ansible 실제 변수 파일 (예제 제외)
 ansible/group_vars/*/secrets.yml
-ansible/group_vars/*/vault.yml
 ansible/host_vars/*/secrets.yml
 
 # ========================================

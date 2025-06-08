@@ -37,6 +37,7 @@
   args:
     executable: /bin/bash
   become: true
+  when: "'backend' in group_names or 'ai' in group_names"
 
 # pip3 설치
 - name: Ensure pip3 is installed
@@ -88,4 +89,5 @@
     groups: docker
     append: yes
   become: true
+  when: "'backend' in group_names or 'ai' in group_names"
 # 이후 newgrp docker 직접 실행하거나, 재부팅 후 적용

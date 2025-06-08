@@ -1,36 +1,36 @@
 - name: Clone frontend repository (clean)
   git:
-    repo: https://github.com/100-hours-a-week/14-YG-FE
-    dest: /home/ubuntu/14-YG-FE
+    repo: "{{ project_repos.fe_url }}"
+    dest: "{{ project_paths.fe_repo }}"
     version: "{{ branch }}"
     force: yes # <- update 대신 강제 덮어쓰기. git pull 충돌 방지
 
-- name: Ensure 14-YG-FE directory ownership is ubuntu:ubuntu
+- name: Ensure 14-YG-FE directory ownership is {{ system.user }}:{{ system.user }}
   file:
-    path: /home/ubuntu/14-YG-FE
+    path: "{{ project_paths.fe_repo }}"
     recurse: yes
     state: directory
-    owner: ubuntu
-    group: ubuntu
+    owner: "{{ system.user }}"
+    group: "{{ system.user }}"
   become: true
 
 - name: Generate .env file for Vite
   template:
     src: vite.env.j2
-    dest: /home/ubuntu/14-YG-FE/.env.prod
+    dest: "{{ project_paths.fe_repo }}/.env.prod"
     mode: "0644"
   become: true
 
 - name: Install frontend dependencies
   npm:
-    path: /home/ubuntu/14-YG-FE
+    path: "{{ project_paths.fe_repo }}"
     state: present
   become: false
 
 - name: Build frontend project
   shell: npm run build
   args:
-    chdir: /home/ubuntu/14-YG-FE
+    chdir: "{{ project_paths.fe_repo }}"
   register: fe_build_result
   failed_when: fe_build_result.rc != 0
   become: false
@@ -46,7 +46,7 @@
   become: true
 
 - name: Deploy built frontend to nginx
-  shell: rsync -av --delete /home/ubuntu/14-YG-FE/dist/ {{ path.nginx }}/
+  shell: rsync -av --delete "{{ project_paths.fe_repo }}/dist/" {{ path.nginx }}/
   become: true
 
 - name: Health check for React frontend (via localhost)
@@ -69,6 +69,6 @@
           delaycompress
           missingok
           notifempty
-          create 0644 ubuntu ubuntu
+          create 0644 {{ system.user }} {{ system.user }}
       }
   become: true

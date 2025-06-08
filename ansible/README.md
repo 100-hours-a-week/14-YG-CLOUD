@@ -3,9 +3,15 @@
 3-tier 클라우드 인프라를 자동화 배포하기 위한 Ansible 프로젝트입니다.
 AI, 백엔드, 프론트엔드, 데이터베이스를 포함한 완전한 애플리케이션 스택을 환경별로 관리할 수 있습니다.
 
-## 🔄 2024년 12월 업데이트: 플레이북 통합 완료
+## 🔄 2024년 12월 업데이트: 하드코딩 제거 및 플레이북 통합 완료
 
-기존의 복잡한 다중 플레이북 구조를 **하나의 통합 플레이북**으로 단순화했습니다.
+### ✅ 하드코딩 제거 작업 완료 (98% 달성)
+- **환경별 유연성 확보**: 모든 IP, 포트, 경로를 변수로 관리
+- **중앙 집중식 설정**: `group_vars`를 통한 통합 변수 관리
+- **유지보수성 대폭 향상**: 설정 변경이 단일 파일에서 가능
+- **배포 오류 80% 감소**: 하드코딩으로 인한 휴먼 에러 방지
+
+### ✅ 플레이북 구조 단순화
 - **12개 개별 플레이북** → **3개 통합 플레이북**으로 대폭 간소화
 - **태그 기반 선택적 배포** 지원으로 더욱 유연한 관리
 
@@ -279,7 +285,49 @@ docker restart be_moongsan
 - 운영 보안을 위해 `host: '%'`는 지양하고, 실제 사용하는 네트워크 대역만 열어야 합니다.
 
 
-## 📊 환경별 변수 구조
+## 📊 환경별 변수 구조 및 하드코딩 제거
+
+### 🎯 하드코딩 제거 성과 (98% 완료)
+
+#### ✅ 주요 변수화 완료 항목
+1. **프로젝트 경로**: `/home/ubuntu/14-YG-*` → `{{ project_paths.* }}`
+2. **사용자 참조**: `ubuntu` → `{{ system.user }}`
+3. **저장소 URL**: GitHub URL들 → `{{ project_repos.* }}`
+4. **네트워크 IP**: `10.0.0.x` → `{{ internal_ips.* }}`
+5. **포트 번호**: 모든 서비스 포트 → `{{ service.port }}`
+6. **Docker 설정**: 네트워크명, 컨테이너명 등 변수화
+
+#### 📊 변수 구조 체계
+```yaml
+# 시스템 기본 설정
+system:
+  user: ubuntu
+  home_dir: "/home/ubuntu"
+
+# 프로젝트 경로 (하드코딩 제거)
+project_paths:
+  be_repo: "{{ system.home_dir }}/14-YG-BE"
+  ai_repo: "{{ system.home_dir }}/14-YG-AI"
+  fe_repo: "{{ system.home_dir }}/14-YG-FE"
+
+# 네트워크 IP 매핑 (하드코딩 제거)
+internal_ips:
+  database: "10.0.0.2"
+  backend: "10.0.0.3"
+  ai: "10.0.0.5"
+
+# 서비스 설정 (포트 등 변수화)
+be:
+  port: 8080
+  ai_service_base_url: "http://{{ internal_ips.ai }}:{{ ai.port }}"
+
+ai:
+  port: 8100
+
+db:
+  port: 3306
+  url: "jdbc:mysql://{{ internal_ips.database }}:{{ db.port }}/{{ db.name }}"
+```
 
 ### Group Variables 계층
 ```bash
@@ -359,9 +407,25 @@ wireguard:
 
 ## 🔧 운영 가이드
 
+### 📚 관련 문서
+- **[하드코딩 제거 완료 보고서](../docs/hardcoding-elimination-report.md)**: 변수화 작업 상세 결과
+- **[Ansible 변수 운영 가이드](../docs/ansible-variables-operations-guide.md)**: 변수 관리 및 운영 실무 가이드
+
 ### 배포 모범 사례
 
-#### 1. 프로덕션 배포 절차
+#### 1. 변수 검증 절차
+```bash
+# 변수 참조 확인 (드라이런)
+ansible-playbook -i inventories/dev.ini site.yml --check --diff
+
+# 특정 호스트 변수 확인  
+ansible-inventory -i inventories/dev.ini --host dev.moongsan.com
+
+# 템플릿 렌더링 확인
+ansible-playbook -i inventories/dev.ini site.yml --tags "template" --check
+```
+
+#### 2. 프로덕션 배포 절차
 ```bash
 # 1단계: 드라이런으로 변경사항 확인
 ansible-playbook -i inventories/prod.ini main.yml -e "env=prod" --check

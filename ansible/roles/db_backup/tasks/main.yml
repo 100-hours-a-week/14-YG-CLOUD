@@ -30,8 +30,8 @@
   file:
     path: "{{ item }}"
     state: directory
-    owner: ubuntu
-    group: ubuntu
+    owner: "{{ system.user }}"
+    group: "{{ system.user }}"
     mode: "0755"
   loop:
     - "{{ path.backup }}"
@@ -43,16 +43,16 @@
   template:
     src: db_backup.sh.j2
     dest: "{{ path.script }}/db_backup.sh"
-    owner: ubuntu
-    group: ubuntu
+    owner: "{{ system.user }}"
+    group: "{{ system.user }}"
     mode: "0755"
 
 - name: Deploy GCP service account key template
   template:
     src: gcs-key.json.j2
     dest: "{{ path.secret }}/my-gcs-key.json"
-    owner: ubuntu
-    group: ubuntu
+    owner: "{{ system.user }}"
+    group: "{{ system.user }}"
     mode: "0600"
 
 - name: Schedule daily cronjob for DB backup

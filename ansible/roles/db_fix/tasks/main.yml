@@ -1,20 +1,20 @@
 - name: Check if DB dump file exists
   stat:
-    path: "/home/ubuntu/moongsan_prod_db_2025-05-29-03-00.sql"
+    path: "{{ system.home_dir }}/moongsan_prod_db_2025-05-29-03-00.sql"
   register: db_dump_stat
 
 - name: Upload DB dump file
   copy:
     src: "./files/moongsan_prod_db_2025-05-29-03-00.sql"
-    dest: "/home/ubuntu/moongsan_prod_db_2025-05-29-03-00.sql"
+    dest: "{{ system.home_dir }}/moongsan_prod_db_2025-05-29-03-00.sql"
     mode: "0644"
 
 - name: Recheck if DB dump file exists
   stat:
-    path: "/home/ubuntu/moongsan_prod_db_2025-05-29-03-00.sql"
+    path: "{{ system.home_dir }}/moongsan_prod_db_2025-05-29-03-00.sql"
   register: db_dump_stat # 덮어쓰기
 
 - name: Restore DB from dump
   shell: >
-    mysql -u {{ db.user }} -p'{{ db.password }}' moongsan_dev_db < /home/ubuntu/moongsan_prod_db_2025-05-29-03-00.sql
+    mysql -u {{ db.user }} -p'{{ db.password }}' moongsan_dev_db < {{ system.home_dir }}/moongsan_prod_db_2025-05-29-03-00.sql
   when: db_dump_stat.stat.exists

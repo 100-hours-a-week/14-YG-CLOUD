@@ -5,6 +5,21 @@
     update_cache: yes
   become: true
 
+- name: Install Python3 and pip for MySQL module
+  apt:
+    name:
+      - python3
+      - python3-pip
+    state: present
+    update_cache: yes
+  become: true
+
+- name: Install PyMySQL module
+  pip:
+    name: PyMySQL
+    executable: pip3
+  become: true
+
 - name: Restart MySQL
   service:
     name: mysql
@@ -44,7 +59,7 @@
 - name: Grant DB access to moongsan_admin from Docker host
   community.mysql.mysql_user:
     name: "{{ db.user }}"
-    host: "172.18.0.%"
+    host: "{{ docker.network_subnet | regex_replace('/[0-9]+$', '.%') }}"
     password: "{{ db.password }}"
     priv: "{{ db.name }}.*:ALL"
     state: present
@@ -54,21 +69,21 @@
     ansible_python_interpreter: /usr/bin/python3
 
 - name: Set system timezone to Asia/Seoul
-  command: timedatectl set-timezone Asia/Seoul
-  when: ansible_date_time.tz != "KST"
+  command: timedatectl set-timezone "{{ system.timezone }}"
+  when: ansible_date_time.tz != "{{ system.timezone_code }}"
 
 - name: Set MySQL default timezone
   lineinfile:
     path: /etc/mysql/mysql.conf.d/mysqld.cnf
     regexp: "^default-time-zone"
-    line: 'default-time-zone = "+09:00"'
+    line: 'default-time-zone = "{{ mysql.timezone }}"'
     insertafter: "[mysqld]"
 
 - name: Set MySQL bind-address to 0.0.0.0
   lineinfile:
     path: /etc/mysql/mysql.conf.d/mysqld.cnf
     regexp: "^bind-address"
-    line: "bind-address = 0.0.0.0"
+    line: "bind-address = {{ mysql.bind_address }}"
     insertafter: "[mysqld]"
   notify: Restart MySQL
   become: true

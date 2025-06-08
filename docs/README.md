@@ -48,6 +48,13 @@ Internet → Load Balancer → Private VPC (10.0.0.0/16)
 - Ansible 애플리케이션 배포
 - 환경별 설정 관리
 
+#### [`ansible-deployment-architecture.md`](./ansible-deployment-architecture.md) ⭐
+**Ansible 배포 아키텍처** - 서버별 Role 매핑 및 Docker 네트워크
+- 서버별 Ansible Role 실행 매핑표
+- Docker 네트워크와 3-Tier 구조 설명
+- 배포 순서 및 의존성 관계
+- 네트워크 통신 흐름 및 보안
+
 #### [`security-guide.md`](./security-guide.md)
 **보안 설정 가이드** - 보안 구성 및 관리
 - VPN 설정 및 인증서 관리

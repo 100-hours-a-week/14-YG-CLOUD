@@ -1,5 +1,8 @@
-- name: Ensure Docker network moongsan-net exists
+- name: Ensure Docker network {{ docker.network_name }} exists
   community.docker.docker_network:
-    name: moongsan-net
+    name: "{{ docker.network_name }}"
+    driver: "{{ docker.network_driver }}"
+    ipam_config:
+      - subnet: "{{ docker.network_subnet }}"
     state: present
   become: true
