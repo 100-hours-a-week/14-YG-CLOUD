@@ -75,6 +75,24 @@ resource "google_compute_firewall" "allow_internal" {
   target_tags   = ["internal"]
 }
 
+# 방화벽 규칙 - VPC 내부 통신 (VM들 간의 직접 통신)
+resource "google_compute_firewall" "allow_vpc_internal" {
+  name    = "${var.project_name}-${var.env}-allow-vpc-internal"
+  network = google_compute_network.vpc.name
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22", "3306", "6379", "8080", "8100", "9090", "9100", "3000", "27017"]
+  }
+
+  allow {
+    protocol = "icmp"
+  }
+
+  source_ranges = [var.subnet_cidr]
+  target_tags   = ["internal"]
+}
+
 # NAT Gateway (Private VM들의 인터넷 접근용)
 resource "google_compute_router" "router" {
   name    = "${var.project_name}-${var.env}-router"

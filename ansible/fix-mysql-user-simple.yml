@@ -1,0 +1,10 @@
+---
+- name: Fix MySQL user permissions for backend access
+  hosts: database
+  become: yes
+  tasks:
+    - name: Create MySQL user for 10.0.0.% network using raw command
+      shell: |
+        mysql -u root -ppass -e "CREATE USER IF NOT EXISTS 'moongsan_admin'@'10.0.0.%' IDENTIFIED BY 'N4pT!6xuV2#rLm3z';"
+        mysql -u root -ppass -e "GRANT ALL PRIVILEGES ON moongsan_test_db.* TO 'moongsan_admin'@'10.0.0.%';"
+        mysql -u root -ppass -e "FLUSH PRIVILEGES;"

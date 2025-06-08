@@ -1,0 +1,27 @@
+---
+- name: Fix MySQL user permissions for backend access
+  hosts: database
+  become: yes
+  tasks:
+    - name: Create MySQL user for 10.0.0.% network
+      mysql_user:
+        name: "{{ service_name }}_admin"
+        password: "{{ db.password }}"
+        host: "10.0.0.%"
+        priv: "{{ service_name }}_{{ env }}_db.*:ALL"
+        state: present
+        login_user: "{{ db.root_user }}"
+        login_password: "{{ db.root_password }}"
+      ignore_errors: yes
+
+    - name: Grant privileges to existing user from 10.0.0.% network
+      mysql_user:
+        name: "{{ service_name }}_admin"
+        host: "10.0.0.%"
+        priv: "{{ service_name }}_{{ env }}_db.*:ALL"
+        state: present
+        login_user: "{{ db.root_user }}"
+        login_password: "{{ db.root_password }}"
+
+    - name: Flush privileges
+      command: mysql -u {{ db.root_user }} -p{{ db.root_password }} -e "FLUSH PRIVILEGES;"

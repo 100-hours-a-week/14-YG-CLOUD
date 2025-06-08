@@ -34,12 +34,12 @@ output "vm_internal_ips" {
   }
 }
 
-# WireGuard 클라이언트 설정 파일들
-output "wireguard_client_configs" {
-  description = "WireGuard client configuration files"
-  value       = module.wireguard.client_configs
-  sensitive   = true
-}
+# WireGuard 클라이언트 설정 파일들 - Ansible로 관리됨
+# output "wireguard_client_configs" {
+#   description = "WireGuard client configuration files"
+#   value       = module.wireguard.client_configs
+#   sensitive   = true
+# }
 
 # Load Balancer 정보
 output "load_balancer" {

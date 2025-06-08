@@ -28,49 +28,8 @@ module "network" {
   ssh_source_ranges = var.ssh_source_ranges
 }
 
-# Jump Box용 고정 IP
-module "jumpbox_ip" {
-  source = "../../modules/static_ip"
-
-  project_name = var.project_name
-  env          = var.env
-  ip_name      = "jumpbox"
-  region       = var.region
-}
-
-# WireGuard 설정
-module "wireguard" {
-  source = "../../modules/wireguard"
-
-  wireguard_server_ip       = "10.8.0.1/24"
-  wireguard_port            = 51820
-  wireguard_private_key     = var.wireguard_private_key
-  wireguard_public_key      = var.wireguard_public_key
-  wireguard_server_endpoint = module.jumpbox_ip.ip_address
-  wireguard_clients         = var.wireguard_clients
-  allowed_ips               = "10.8.0.0/24,10.0.0.0/24"
-}
-
-# Jump Box VM (WireGuard 서버) - 최적화됨
-module "jumpbox" {
-  source = "../../modules/compute"
-
-  project_name        = var.project_name
-  env                 = var.env
-  vm_name             = "jumpbox"
-  vm_role             = "jumpbox"
-  tier                = "management"
-  machine_type        = "e2-small"         # 최적화: e2-medium → e2-small (57% 비용 절약)
-  disk_size           = 20                 # 최적화: 50GB → 20GB (충분함)
-  zone                = var.zone
-  network_name        = module.network.vpc_name
-  subnet_name         = module.network.subnet_name
-  assign_external_ip  = true
-  external_ip_address = module.jumpbox_ip.ip_address
-  network_tags        = ["ssh", "wireguard-server"]
-  ssh_public_key_path = var.ssh_public_key_path
-  startup_script      = module.wireguard.startup_script
-}
+# Jump Box는 shared 환경의 공유 jump box를 사용
+# 별도의 test jump box는 생성하지 않음
 
 # GCS + CDN for Frontend Static Hosting
 module "frontend_hosting" {

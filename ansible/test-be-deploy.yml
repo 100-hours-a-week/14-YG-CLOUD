@@ -1,0 +1,11 @@
+- name: "백엔드 배포 테스트"
+  hosts: backend
+  become: yes
+  gather_facts: yes
+  vars:
+    target: test
+
+  tasks:
+    - name: "백엔드 배포 역할 실행"
+      include_role:
+        name: be_deploy
