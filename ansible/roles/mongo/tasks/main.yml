@@ -1,0 +1,10 @@
+- name: mongo Container
+  community.docker.docker_container:
+    name: "{{ be.mongo.host }}"
+    image: mongo:latest
+    state: started
+    restart_policy: always
+    networks:
+      - name: moongsan-net
+    published_ports:
+      - "{{ be.mongo.port }}:{{ be.mongo.port }}"
