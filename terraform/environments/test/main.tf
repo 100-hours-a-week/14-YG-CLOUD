@@ -54,9 +54,11 @@ module "backend" {
   zone                = var.zone
   network_name        = module.network.vpc_name
   subnet_name         = module.network.subnet_name
+  network_ip          = "10.0.0.3"        # 고정 IP 지정
   assign_external_ip  = false
-  network_tags        = ["internal"]
+  network_tags        = ["internal", "ssh"]
   ssh_public_key_path = var.ssh_public_key_path
+  ssh_user            = var.ssh_user
   # startup_script 제거 - Ansible로 애플리케이션 설정 관리
 }
 
@@ -74,9 +76,11 @@ module "ai" {
   zone                = var.zone
   network_name        = module.network.vpc_name
   subnet_name         = module.network.subnet_name
+  network_ip          = "10.0.0.4"        # AI 서버 IP를 10.0.0.4로 변경
   assign_external_ip  = false
-  network_tags        = ["internal"]
+  network_tags        = ["internal", "ssh"]
   ssh_public_key_path = var.ssh_public_key_path
+  ssh_user            = var.ssh_user
   # startup_script 제거 - Ansible로 애플리케이션 설정 관리
 }
 
@@ -94,9 +98,11 @@ module "database" {
   disk_size           = 100
   network_name        = module.network.vpc_name
   subnet_name         = module.network.subnet_name
+  network_ip          = "10.0.0.2"        # 고정 IP 지정 (원래 IP로 복원)
   assign_external_ip  = false
-  network_tags        = ["internal"]
+  network_tags        = ["internal", "ssh"]
   ssh_public_key_path = var.ssh_public_key_path
+  ssh_user            = var.ssh_user
   # startup_script 제거 - Ansible로 애플리케이션 설정 관리
 }
 

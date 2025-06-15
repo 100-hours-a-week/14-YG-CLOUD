@@ -63,6 +63,12 @@ variable "subnet_name" {
   type        = string
 }
 
+variable "network_ip" {
+  description = "Internal IP address for the VM (optional)"
+  type        = string
+  default     = null
+}
+
 variable "assign_external_ip" {
   description = "Whether to assign external IP"
   type        = bool
@@ -90,12 +96,6 @@ variable "ssh_user" {
 variable "ssh_public_key_path" {
   description = "Path to SSH public key"
   type        = string
-}
-
-variable "startup_script" {
-  description = "Startup script to run on VM creation"
-  type        = string
-  default     = ""
 }
 
 variable "service_account_email" {

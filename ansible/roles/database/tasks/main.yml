@@ -1,93 +1,144 @@
-- name: Ensure MySQL server is installed (fail-safe)
-  apt:
-    name: mysql-server
-    state: present
-    update_cache: yes
-  become: true
+---
+# Docker-based MySQL Database Setup
+# 3-tier 아키텍처용 MySQL 데이터베이스 컨테이너 배포
 
-- name: Install Python3 and pip for MySQL module
+- name: "Clean up Docker repository conflicts"
+  shell: |
+    rm -f /etc/apt/sources.list.d/docker.list
+    rm -f /etc/apt/keyrings/docker.asc
+    rm -f /etc/apt/keyrings/docker.gpg
+  become: true
+  ignore_errors: yes
+
+- name: "Remove conflicting packages"
   apt:
     name:
-      - python3
-      - python3-pip
-    state: present
+      - containerd.io
+      - docker-ce
+      - docker-ce-cli
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: absent
+    purge: yes
+  become: true
+  ignore_errors: yes
+
+- name: "Update package cache after cleanup"
+  apt:
     update_cache: yes
+    cache_valid_time: 0
   become: true
 
-- name: Install PyMySQL module
+- name: "Install Docker from Ubuntu repositories"
+  apt:
+    name:
+      - docker.io
+      - docker-compose
+      - python3-pip
+    state: present
+    force: yes
+  become: true
+
+- name: "Install Docker Python module"
   pip:
-    name: PyMySQL
+    name: 
+      - docker
+      - docker-compose
     executable: pip3
   become: true
 
-- name: Restart MySQL
-  service:
+- name: "Start and enable Docker service"
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+  become: true
+
+- name: "Add user to docker group"
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+  become: true
+
+- name: "Create Docker network"
+  docker_network:
+    name: "{{ docker.network_name | default('moongsan-net') }}"
+    driver: "{{ docker.network_driver | default('bridge') }}"
+    ipam_config:
+      - subnet: "{{ docker.network_subnet | default('172.20.0.0/16') }}"
+  become: true
+
+- name: "Create MySQL data directory"
+  file:
+    path: "/var/lib/mysql-data"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  become: true
+
+- name: "Stop any existing MySQL services"
+  systemd:
     name: mysql
-    state: restarted
+    state: stopped
+  become: true
+  ignore_errors: yes
 
-- name: Convert MySQL root user to mysql_native_password
+- name: "Kill any MySQL processes using port 3306"
   shell: |
-    mysql -u root -p'{{ db.root_password }}' <<EOF
-    ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '{{ db.root_password }}';
-    FLUSH PRIVILEGES;
-    EOF
+    fuser -k 3306/tcp || true
+    pkill -f mysqld || true
+  become: true
+  ignore_errors: yes
+
+- name: "Wait for port 3306 to be free"
+  wait_for:
+    port: 3306
+    state: stopped
+    timeout: 30
+  ignore_errors: yes
+
+- name: "Stop and remove any existing MySQL container"
+  docker_container:
+    name: "mysql-{{ service_name }}"
+    state: absent
+  become: true
+  ignore_errors: yes
+
+- name: "Run MySQL container"
+  docker_container:
+    name: "mysql-{{ service_name }}"
+    image: "mysql:8.0"
+    state: started
+    restart_policy: always
+    ports:
+      - "3306:3306"
+    volumes:
+      - "/var/lib/mysql-data:/var/lib/mysql"
+    networks:
+      - name: "{{ docker.network_name | default('moongsan-net') }}"
+    env:
+      MYSQL_ROOT_PASSWORD: "{{ db.root_password | default('pass') }}"
+      MYSQL_DATABASE: "{{ database.name | default('moongsan_app') }}"
+      MYSQL_USER: "{{ db.user | default('moongsan_admin') }}"
+      MYSQL_PASSWORD: "{{ db.password | default('N4pT!6xuV2#rLm3z') }}"
+      TZ: "{{ system.timezone | default('Asia/Seoul') }}"
   become: true
 
-- name: Create database
-  community.mysql.mysql_db:
-    name: "{{ db.name }}"
-    state: present
-    encoding: utf8mb4
-    collation: utf8mb4_general_ci
-    login_user: "{{ db.root_user }}"
-    login_password: "{{ db.root_password }}"
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
+- name: "Wait for MySQL to be ready"
+  wait_for:
+    port: "{{ db.port | default('3306') }}"
+    host: "{{ internal_ips.database | default('10.0.0.2') }}"
+    delay: 10
+    timeout: 300
 
-- name: Create database user and grant privileges
-  community.mysql.mysql_user:
-    name: "{{ db.user }}"
-    password: "{{ db.password }}"
-    priv: "{{ db.name }}.*:ALL"
-    host: localhost
-    state: present
-    login_user: "{{ db.root_user }}"
-    login_password: "{{ db.root_password }}"
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-
-- name: Grant DB access to moongsan_admin from Docker host
-  community.mysql.mysql_user:
-    name: "{{ db.user }}"
-    host: "{{ docker.network_subnet | regex_replace('/[0-9]+$', '.%') }}"
-    password: "{{ db.password }}"
-    priv: "{{ db.name }}.*:ALL"
-    state: present
-    login_user: "{{ db.root_user }}"
-    login_password: "{{ db.root_password }}"
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-
-- name: Set system timezone to Asia/Seoul
-  command: timedatectl set-timezone "{{ system.timezone }}"
-  when: ansible_date_time.tz != "{{ system.timezone_code }}"
-
-- name: Set MySQL default timezone
-  lineinfile:
-    path: /etc/mysql/mysql.conf.d/mysqld.cnf
-    regexp: "^default-time-zone"
-    line: 'default-time-zone = "{{ mysql.timezone }}"'
-    insertafter: "[mysqld]"
-
-- name: Set MySQL bind-address to 0.0.0.0
-  lineinfile:
-    path: /etc/mysql/mysql.conf.d/mysqld.cnf
-    regexp: "^bind-address"
-    line: "bind-address = {{ mysql.bind_address }}"
-    insertafter: "[mysqld]"
-  notify: Restart MySQL
+- name: "Verify MySQL container is running"
+  docker_container_info:
+    name: "mysql-{{ service_name }}"
+  register: mysql_container
   become: true
-# - name: Restart MySQL
-#   service:
-#     name: mysql
-#     state: restarted
+
+- name: "Display MySQL container status"
+  debug:
+    msg: "✅ MySQL container is {{ 'running' if mysql_container.container.State.Running else 'not running' }}"

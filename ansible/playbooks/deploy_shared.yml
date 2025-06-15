@@ -37,7 +37,7 @@
   hosts: shared
   become: yes
   roles:
-    - wireguard_setup
+    - wireguard
   tags:
     - wireguard
     - vpn
@@ -45,16 +45,16 @@
   post_tasks:
     - name: WireGuard 서비스 상태 확인
       systemd:
-        name: "wg-quick@{{ wireguard.interface }}"
+        name: "wg-quick@{{ wireguard_interface }}"
       register: wg_service_status
 
     - name: WireGuard 인터페이스 상태 확인
-      shell: "ip addr show {{ wireguard.interface }}"
+      shell: "ip addr show {{ wireguard_interface }}"
       register: wg_interface_status
       failed_when: false
 
     - name: 현재 활성 피어 확인
-      shell: "wg show {{ wireguard.interface }} peers"
+      shell: "wg show {{ wireguard_interface }} peers"
       register: wg_peers
       failed_when: false
 
@@ -62,9 +62,9 @@
       debug:
         msg:
           - "✅ WireGuard 서비스: {{ wg_service_status.status.ActiveState }}"
-          - "✅ 인터페이스: {{ wireguard.interface }}"
-          - "✅ 서버 주소: {{ wireguard.server_address }}"
-          - "✅ 포트: {{ wireguard.port }}"
+          - "✅ 인터페이스: {{ wireguard_interface }}"
+          - "✅ 서버 주소: {{ wireguard_server_ip }}"
+          - "✅ 포트: {{ wireguard_port }}"
           - "✅ 활성 피어 수: {{ wg_peers.stdout_lines | length if wg_peers.rc == 0 else 0 }}"
 
 # 3단계: 백업 설정

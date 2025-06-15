@@ -1,0 +1,21 @@
+---
+# Base System Setup Playbook
+# 모든 서버의 기본 시스템 설정
+
+- name: "Setup Base System for Test Environment"
+  hosts: test
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    env: "test"
+    
+  tasks:
+    - name: "Base System Setup"
+      include_role:
+        name: base_system
+      tags: [base, system]
+      
+    - name: "Show base system setup completion"
+      debug:
+        msg: "✅ Base system setup completed for {{ inventory_hostname }}"

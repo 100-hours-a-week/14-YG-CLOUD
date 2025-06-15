@@ -15,24 +15,24 @@ output "jumpbox_ssh_command" {
 }
 
 # 네트워크 정보
-output "management_vpc_id" {
-  description = "관리 VPC ID"
-  value       = google_compute_network.management_vpc.id
+output "shared_vpc_id" {
+  description = "공유 VPC ID"
+  value       = google_compute_network.shared_vpc.id
 }
 
-output "management_vpc_name" {
-  description = "관리 VPC 이름"
-  value       = google_compute_network.management_vpc.name
+output "shared_vpc_name" {
+  description = "공유 VPC 이름"
+  value       = google_compute_network.shared_vpc.name
 }
 
-output "management_subnet_id" {
-  description = "관리 서브넷 ID"
-  value       = google_compute_subnetwork.management_subnet.id
+output "shared_subnet_id" {
+  description = "공유 서브넷 ID"
+  value       = google_compute_subnetwork.shared_subnet.id
 }
 
-output "management_subnet_name" {
-  description = "관리 서브넷 이름"
-  value       = google_compute_subnetwork.management_subnet.name
+output "shared_subnet_name" {
+  description = "공유 서브넷 이름"
+  value       = google_compute_subnetwork.shared_subnet.name
 }
 
 # WireGuard 설정 정보

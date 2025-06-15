@@ -14,20 +14,20 @@ provider "google" {
   zone    = var.zone
 }
 
-# Management VPC 네트워크 생성
-resource "google_compute_network" "management_vpc" {
-  name                    = "management-vpc"
+# Shared VPC 네트워크 생성
+resource "google_compute_network" "shared_vpc" {
+  name                    = "shared-vpc"
   auto_create_subnetworks = false
-  description             = "Management VPC for shared infrastructure"
+  description             = "Shared VPC for shared infrastructure"
 }
 
-# Management 서브넷 생성
-resource "google_compute_subnetwork" "management_subnet" {
-  name          = "management-subnet"
+# Shared 서브넷 생성
+resource "google_compute_subnetwork" "shared_subnet" {
+  name          = "shared-subnet"
   ip_cidr_range = var.subnet_cidr
   region        = var.region
-  network       = google_compute_network.management_vpc.id
-  description   = "Management subnet for shared jumpbox and tools"
+  network       = google_compute_network.shared_vpc.id
+  description   = "Shared subnet for shared jumpbox and tools"
 
   # Private Google Access 활성화 (GCP 서비스 접근용)
   private_ip_google_access = true
@@ -35,7 +35,7 @@ resource "google_compute_subnetwork" "management_subnet" {
 
 # 공용 고정 IP 주소
 resource "google_compute_address" "jumpbox_ip" {
-  name         = "shared-jumpbox-ip"
+  name         = "moongsan-shared-jumpbox-ip"
   region       = var.region
   address_type = "EXTERNAL"
   description  = "Static IP for shared jumpbox"
@@ -56,8 +56,8 @@ resource "google_compute_instance" "shared_jumpbox" {
   }
 
   network_interface {
-    network    = google_compute_network.management_vpc.name
-    subnetwork = google_compute_subnetwork.management_subnet.name
+    network    = google_compute_network.shared_vpc.name
+    subnetwork = google_compute_subnetwork.shared_subnet.name
     
     access_config {
       nat_ip = google_compute_address.jumpbox_ip.address
@@ -81,8 +81,8 @@ resource "google_compute_instance" "shared_jumpbox" {
 
 # SSH 접근 허용 방화벽 규칙
 resource "google_compute_firewall" "allow_ssh" {
-  name    = "management-allow-ssh"
-  network = google_compute_network.management_vpc.name
+  name    = "shared-allow-ssh"
+  network = google_compute_network.shared_vpc.name
 
   allow {
     protocol = "tcp"
@@ -95,8 +95,8 @@ resource "google_compute_firewall" "allow_ssh" {
 
 # WireGuard VPN 접근 허용 방화벽 규칙
 resource "google_compute_firewall" "allow_wireguard" {
-  name    = "management-allow-wireguard"
-  network = google_compute_network.management_vpc.name
+  name    = "shared-allow-wireguard"
+  network = google_compute_network.shared_vpc.name
 
   allow {
     protocol = "udp"
@@ -109,8 +109,8 @@ resource "google_compute_firewall" "allow_wireguard" {
 
 # 환경별 VPC 접근 허용 방화벽 규칙
 resource "google_compute_firewall" "allow_environment_access" {
-  name    = "management-allow-environments"
-  network = google_compute_network.management_vpc.name
+  name    = "shared-allow-environments"
+  network = google_compute_network.shared_vpc.name
 
   allow {
     protocol = "tcp"
@@ -134,12 +134,12 @@ data "google_compute_network" "test_vpc" {
   name = "moongsan-test-vpc"
 }
 
-# VPC 피어링 모듈 - 관리 VPC와 환경별 VPC 연결
+# VPC 피어링 모듈 - 공유 VPC와 환경별 VPC 연결
 module "vpc_peering" {
   source = "../../modules/vpc_peering"
 
-  project_name              = "moongsan"
-  management_vpc_self_link  = google_compute_network.management_vpc.self_link
+  project_name         = "moongsan"
+  shared_vpc_self_link = google_compute_network.shared_vpc.self_link
   
   environment_vpcs = {
     test = data.google_compute_network.test_vpc.self_link

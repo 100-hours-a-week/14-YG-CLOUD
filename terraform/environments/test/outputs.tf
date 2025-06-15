@@ -1,8 +1,3 @@
-output "jumpbox_external_ip" {
-  description = "Jump Box external IP address"
-  value       = module.jumpbox_ip.ip_address
-}
-
 output "frontend_hosting" {
   description = "Frontend hosting information"
   value = {
@@ -27,7 +22,6 @@ output "subnet_name" {
 output "vm_internal_ips" {
   description = "Internal IP addresses of all VMs"
   value = {
-    jumpbox  = module.jumpbox.internal_ip
     backend  = module.backend.internal_ip
     ai       = module.ai.internal_ip
     database = module.database.internal_ip
@@ -51,15 +45,10 @@ output "load_balancer" {
   }
 }
 
-# Ansible 인벤토리를 위한 정보
+# Ansible 인벤토리를 위한 정보 - shared-jumpbox 사용
 output "ansible_inventory" {
   description = "Ansible inventory information"
   value = {
-    jumpbox = {
-      ansible_host = module.jumpbox_ip.ip_address
-      internal_ip  = module.jumpbox.internal_ip
-      role         = "jumpbox"
-    }
     backend = {
       ansible_host = module.backend.internal_ip
       internal_ip  = module.backend.internal_ip

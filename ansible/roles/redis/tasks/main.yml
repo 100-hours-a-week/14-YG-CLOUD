@@ -1,6 +1,6 @@
 - name: Redis Container
   community.docker.docker_container:
-    name: "{{ be.redis.host }}"
+    name: "{{ redis.host }}"
     image: "{{ redis.image }}"
     state: started
     restart_policy: always

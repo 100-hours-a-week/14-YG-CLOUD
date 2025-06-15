@@ -1,4 +1,4 @@
-- name: Ensure Docker network {{ docker.network_name }} exists
+- name: "Ensure Docker network exists"
   community.docker.docker_network:
     name: "{{ docker.network_name }}"
     driver: "{{ docker.network_driver }}"

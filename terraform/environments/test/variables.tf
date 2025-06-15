@@ -60,6 +60,12 @@ variable "ssh_public_key_path" {
   default     = "~/.ssh/lsh-study-key.pub"
 }
 
+variable "ssh_user" {
+  description = "SSH username for VM access"
+  type        = string
+  default     = "ubuntu"
+}
+
 # WireGuard 설정
 variable "wireguard_private_key" {
   description = "WireGuard server private key"
@@ -112,5 +118,3 @@ variable "domain_name" {
   type        = string
   default     = "test.moongsan.com"
 }
-
-# SSH 설정

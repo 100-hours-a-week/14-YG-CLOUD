@@ -1,0 +1,49 @@
+---
+# Backend Application Deployment Playbook
+# Spring Boot 백엔드 애플리케이션 배포
+
+- name: "Deploy Backend Application"
+  hosts: backend
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    env: "test"
+    
+  pre_tasks:
+    - name: "Show backend deployment start"
+      debug:
+        msg: "🚀 Starting Backend application deployment on {{ inventory_hostname }}"
+        
+  tasks:
+    - name: "Setup base system"
+      include_role:
+        name: base_system
+      tags: [base]
+      
+    - name: "Setup common configurations"
+      include_role:
+        name: common
+      tags: [common]
+      
+    - name: "Deploy backend application"
+      include_role:
+        name: be_deploy
+      tags: [backend, spring]
+      
+  post_tasks:
+    - name: "Verify backend container status"
+      docker_container_info:
+        name: "{{ be.container_name }}"
+      register: backend_info
+      become: true
+      ignore_errors: yes
+      
+    - name: "Show backend deployment result"
+      debug:
+        msg: |
+          ✅ Backend Application Deployment Complete!
+          Container Name: {{ be.container_name }}
+          Status: {{ 'Running' if backend_info.container.State.Running else 'Stopped' }}
+          Port: {{ be.port }}
+          Image: {{ be.image }}:{{ be.tag }}

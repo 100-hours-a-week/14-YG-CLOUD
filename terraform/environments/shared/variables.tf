@@ -18,7 +18,7 @@ variable "zone" {
 variable "jumpbox_name" {
   description = "Jumpbox 인스턴스 이름"
   type        = string
-  default     = "shared-jumpbox"
+  default     = "moongsan-shared-jumpbox"
 }
 
 variable "jumpbox_machine_type" {
@@ -39,16 +39,16 @@ variable "jumpbox_image_family" {
   default     = "ubuntu-2204-lts"
 }
 
-variable "management_vpc_name" {
-  description = "관리 VPC 이름"
+variable "shared_vpc_name" {
+  description = "공유 VPC 이름"
   type        = string
-  default     = "management-vpc"
+  default     = "shared-vpc"
 }
 
 variable "subnet_name" {
-  description = "관리 서브넷 이름"
+  description = "공유 서브넷 이름"
   type        = string
-  default     = "management-subnet"
+  default     = "shared-subnet"
 }
 
 variable "subnet_cidr" {

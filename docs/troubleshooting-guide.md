@@ -9,6 +9,7 @@
 - [WireGuard VPN 문제해결](#wireguard-vpn-문제해결)
 - [GCP 리소스 문제해결](#gcp-리소스-문제해결)
 - [네트워크 연결 문제해결](#네트워크-연결-문제해결)
+  - [Backend → MySQL 연결 문제 (완전한 해결 가이드)](#문제-backend에서-mysql-database-연결-실패-완전한-해결-가이드)
 - [보안 관련 문제해결](#보안-관련-문제해결)
 
 ---
@@ -338,7 +339,112 @@ gcloud logging read "resource.type=http_load_balancer"
 
 ### 🔗 서비스 간 통신 문제
 
-#### **문제**: Backend에서 Database 연결 실패
+#### **문제**: Backend에서 MySQL Database 연결 실패 (완전한 해결 가이드)
+
+**증상들**:
+```bash
+# SSH 접근 불가
+ssh: connect to host 10.0.0.3 port 22: Connection refused
+
+# MySQL 연결 실패
+mysql: ERROR 2003 (HY000): Can't connect to MySQL server on '10.0.0.2'
+
+# Ansible 연결 실패
+UNREACHABLE! => {"msg": "Failed to connect to the host via ssh"}
+```
+
+**근본 원인 분석 및 해결**:
+
+**1단계: SSH 태그 및 방화벽 문제 해결**
+```bash
+# 문제: VM에 ssh 태그가 없어서 방화벽 규칙 미적용
+# 해결: SSH 태그 추가
+
+# 즉시 해결 (gcloud 사용)
+gcloud compute instances add-tags moongsan-test-database --tags=ssh --zone=asia-northeast3-a
+gcloud compute instances add-tags moongsan-test-backend --tags=ssh --zone=asia-northeast3-a  
+gcloud compute instances add-tags moongsan-test-ai --tags=ssh --zone=asia-northeast3-a
+
+# Terraform 설정 수정 (영구 해결)
+# terraform/environments/test/main.tf
+network_tags = ["internal", "ssh"]  # ssh 태그 추가
+
+# 상태 동기화
+terraform refresh
+terraform plan  # "No changes" 확인
+```
+
+**2단계: WireGuard VPN 연결 복구**
+```bash
+# 문제: 서버 IP 변경으로 인한 VPN 연결 실패
+# 해결: 새 서버 설정으로 업데이트
+
+# 새 서버 키 생성
+wg genkey | tee server-private.key | wg pubkey > server-public.key
+
+# 클라이언트 설정 업데이트 (새 IP: 34.22.110.81)
+# 모든 팀원 클라이언트 설정 파일 업데이트 필요
+```
+
+**3단계: 네트워크 연결 검증**
+```bash
+# VPN 연결 확인
+sudo wg show
+
+# 내부 네트워크 ping 테스트
+ping -c 2 10.0.0.2  # Database
+ping -c 2 10.0.0.3  # Backend  
+ping -c 2 10.0.0.4  # AI
+
+# SSH 연결 테스트
+ssh -i ~/.ssh/lsh-study-key ubuntu@10.0.0.3
+
+# MySQL 포트 연결 테스트
+nc -zv 10.0.0.2 3306
+# 성공: Connection to 10.0.0.2 3306 port [tcp/mysql] succeeded!
+```
+
+**4단계: MySQL 클라이언트 설치 및 연결 테스트**
+```bash
+# Backend 서버에 MySQL 클라이언트 설치
+ansible test-backend -i inventories/test.ini -m apt \
+  -a "name=mysql-client state=present update_cache=yes" --become
+
+# 연결 테스트 (Backend에서 Database로)
+ansible test-backend -i inventories/test.ini -m shell \
+  -a "mysql -h 10.0.0.2 -u app_user -papp_password_2024! moongsan_app -e 'SELECT CONNECTION_ID(), USER(), DATABASE(), NOW();'" -v
+
+# 성공 결과 예시:
+# CONNECTION_ID() USER()              DATABASE()    NOW()
+# 102             app_user@10.0.0.3   moongsan_app  2025-06-13 00:50:26
+```
+
+**5단계: 실제 데이터 조작 테스트**
+```bash
+# 테스트 테이블 생성
+ansible test-backend -i inventories/test.ini -m shell \
+  -a "mysql -h 10.0.0.2 -u app_user -papp_password_2024! moongsan_app -e 'CREATE TABLE test_connection (id INT AUTO_INCREMENT PRIMARY KEY, message VARCHAR(100), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);'"
+
+# 데이터 INSERT
+ansible test-backend -i inventories/test.ini -m shell \
+  -a "mysql -h 10.0.0.2 -u app_user -papp_password_2024! moongsan_app -e \"INSERT INTO test_connection (message) VALUES ('Backend to Database connection successful!');\""
+
+# 데이터 SELECT 확인
+ansible test-backend -i inventories/test.ini -m shell \
+  -a "mysql -h 10.0.0.2 -u app_user -papp_password_2024! moongsan_app -e 'SELECT * FROM test_connection;'"
+```
+
+**문제 해결 체크리스트**:
+1. ✅ **WireGuard VPN 연결** - `sudo wg show`
+2. ✅ **VM 태그 확인** - `gcloud compute instances describe VM_NAME --zone=ZONE`
+3. ✅ **SSH 접근** - `ssh -i ~/.ssh/key ubuntu@10.0.0.X`
+4. ✅ **MySQL 서비스** - `docker ps | grep mysql`
+5. ✅ **포트 연결** - `nc -zv 10.0.0.2 3306`
+6. ✅ **MySQL 사용자** - `SELECT user, host FROM mysql.user;`
+
+**참고 문서**: `docs/backend-mysql-connection-guide.md`
+
+#### **문제**: Backend에서 Database 연결 실패 (기본)
 ```bash
 Connection refused: database_host:3306
 ```
@@ -480,3 +586,15 @@ sudo reboot
 ---
 
 > 🛠️ **문제해결 팁**: 문제가 발생하면 당황하지 말고 단계별로 차근차근 확인하세요. 대부분의 문제는 설정 오류나 권한 문제입니다.
+
+## 📚 관련 문서
+
+- [Backend → MySQL 연결 완전 가이드](./backend-mysql-connection-guide.md)
+- [인프라 아키텍처 가이드](./infrastructure-architecture.md)
+- [배포 가이드](./deployment-guide.md)
+- [보안 가이드](./security-guide.md)
+
+---
+
+**문서 최종 업데이트**: 2025-06-13  
+**주요 추가 내용**: Backend → MySQL 연결 문제 완전 해결 가이드 추가

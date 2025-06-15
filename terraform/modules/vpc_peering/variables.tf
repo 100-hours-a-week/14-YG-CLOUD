@@ -3,8 +3,8 @@ variable "project_name" {
   type        = string
 }
 
-variable "management_vpc_self_link" {
-  description = "Self link of the management VPC"
+variable "shared_vpc_self_link" {
+  description = "Self link of the shared VPC"
   type        = string
 }
 

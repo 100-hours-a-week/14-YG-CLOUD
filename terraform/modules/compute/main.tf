@@ -17,6 +17,7 @@ resource "google_compute_instance" "vm" {
   network_interface {
     network    = var.network_name
     subnetwork = var.subnet_name
+    network_ip = var.network_ip
     
     # 외부 IP 할당 여부 (Jump Box만 외부 IP 필요)
     dynamic "access_config" {
@@ -29,8 +30,6 @@ resource "google_compute_instance" "vm" {
 
   metadata = {
     ssh-keys = "${var.ssh_user}:${file(var.ssh_public_key_path)}"
-    # startup-script는 필요한 경우만 사용 (WireGuard 등 인프라 설정용)
-    startup-script = var.startup_script != "" ? var.startup_script : null
   }
 
   tags = var.network_tags

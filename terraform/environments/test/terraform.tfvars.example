@@ -43,8 +43,3 @@ wireguard_clients = [
     public_key  = "DATABASE_PUBLIC_KEY_HERE"
   }
 ]
-
-# 스타트업 스크립트 (선택사항)
-backend_startup_script  = ""
-ai_startup_script      = ""
-database_startup_script = ""

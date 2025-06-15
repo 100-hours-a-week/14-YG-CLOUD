@@ -52,32 +52,6 @@ resource "google_compute_instance" "shared_jumpbox" {
     ssh-keys = "ubuntu:${var.ssh_public_key}"
   }
 
-  # 시작 스크립트 - 기본 도구 설치
-  metadata_startup_script = <<-EOF
-    #!/bin/bash
-    apt-get update
-    apt-get install -y curl wget git vim htop unzip
-    
-    # Docker 설치
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sh get-docker.sh
-    usermod -aG docker ubuntu
-    
-    # Google Cloud SDK 설치
-    curl https://sdk.cloud.google.com | bash
-    
-    # Terraform 설치
-    wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
-    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list
-    apt-get update && apt-get install -y terraform
-    
-    # Ansible 설치
-    apt-get install -y python3-pip
-    pip3 install ansible
-    
-    echo "Shared jumpbox setup completed" > /var/log/startup-complete.log
-  EOF
-
   service_account {
     scopes = [
       "https://www.googleapis.com/auth/devstorage.read_only",
