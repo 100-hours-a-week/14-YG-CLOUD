@@ -93,6 +93,24 @@ resource "google_compute_firewall" "allow_vpc_internal" {
   target_tags   = ["internal"]
 }
 
+# 방화벽 규칙 - Shared VPC 접근 (jumpbox를 통한 접근)
+resource "google_compute_firewall" "allow_shared_vpc_access" {
+  name    = "${var.project_name}-${var.env}-allow-shared-access"
+  network = google_compute_network.vpc.name
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22", "3306", "6379", "8080", "8100", "9090", "9100", "3000", "27017"]
+  }
+
+  allow {
+    protocol = "icmp"
+  }
+
+  source_ranges = [var.shared_vpc_cidr]
+  target_tags   = ["internal"]
+}
+
 # NAT Gateway (Private VM들의 인터넷 접근용)
 resource "google_compute_router" "router" {
   name    = "${var.project_name}-${var.env}-router"

@@ -1,5 +1,2 @@
-dependencies:
-  - role: clone_cloud
-  - role: docker_net
-  - role: redis
-  - role: mongo
+# No dependencies - managed by playbook
+dependencies: []

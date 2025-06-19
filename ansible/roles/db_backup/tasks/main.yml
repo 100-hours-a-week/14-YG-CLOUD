@@ -34,15 +34,15 @@
     group: "{{ system.user }}"
     mode: "0755"
   loop:
-    - "{{ path.backup }}"
-    - "{{ path.log }}"
-    - "{{ path.script }}"
-    - "{{ path.secret }}"
+    - "{{ paths.backup }}"
+    - "{{ paths.log }}"
+    - "{{ paths.script }}"
+    - "{{ paths.secret }}"
 
 - name: Deploy DB backup script from template
   template:
     src: db_backup.sh.j2
-    dest: "{{ path.script }}/db_backup.sh"
+    dest: "{{ paths.script }}/db_backup.sh"
     owner: "{{ system.user }}"
     group: "{{ system.user }}"
     mode: "0755"
@@ -50,7 +50,7 @@
 - name: Deploy GCP service account key template
   template:
     src: gcs-key.json.j2
-    dest: "{{ path.secret }}/my-gcs-key.json"
+    dest: "{{ paths.secret }}/my-gcs-key.json"
     owner: "{{ system.user }}"
     group: "{{ system.user }}"
     mode: "0600"
@@ -59,14 +59,14 @@
   cron:
     name: "Daily DB backup to GCS"
     user: root
-    job: 'PATH=/snap/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin GOOGLE_APPLICATION_CREDENTIALS="{{ path.secret }}/my-gcs-key.json" {{ path.script }}/db_backup.sh >> {{ path.log }}/db_backup.log 2>&1'
+    job: 'PATH=/snap/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin GOOGLE_APPLICATION_CREDENTIALS="{{ paths.secret }}/my-gcs-key.json" {{ paths.script }}/db_backup.sh >> {{ paths.log }}/db_backup.log 2>&1'
     hour: "03"
 
 - name: Configure logrotate for DB backup log
   copy:
     dest: /etc/logrotate.d/db_backup
     content: |
-      {{ path.log }}/db_backup.log {
+      {{ paths.log }}/db_backup.log {
           daily
           rotate 7
           compress

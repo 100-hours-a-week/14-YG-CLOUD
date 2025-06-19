@@ -1,7 +1,12 @@
+- name: Debug project_repos variable
+  debug:
+    var: project_repos
+  when: "'backend' in group_names or 'ai' in group_names"
+
 - name: Clone 14-YG-CLOUD repository
   git:
-    repo: "{{ project_repos.cloud_url }}"
-    dest: "{{ project_paths.cloud_repo }}"
-    version: "{{ project_repos.cloud_branch }}"
+    repo: "https://github.com/100-hours-a-week/14-YG-CLOUD.git"
+    dest: "/var/14-YG-CLOUD"
+    version: "feat/source-to-docker"
     force: yes
   when: "'backend' in group_names or 'ai' in group_names"

@@ -2,7 +2,7 @@ server {
     listen 80;
     server_name {{ nginx.domain }};
 
-    root {{ path.nginx }};
+    root {{ paths.nginx }};
     index index.html;
 
     location / {

@@ -1,0 +1,36 @@
+# Frontend GCS 배포 테스트 플레이북
+# 사용법: ansible-playbook -i test.ini test_fe_deploy.yml
+
+- name: "🎯 Frontend GCS 배포 테스트"
+  hosts: jumpbox
+  gather_facts: yes
+  vars:
+    deployment_env: "test"
+  vars_files:
+    - "../group_vars/test/all.yml"
+
+  tasks:
+    - name: "🚀 Frontend 배포 시작"
+      debug:
+        msg:
+          - "🎯 배포 환경: {{ deployment_env | upper }}"
+          - "📅 배포 시간: {{ ansible_date_time.iso8601 }}"
+          - "👤 실행 사용자: {{ ansible_user_id }}"
+          - "🌐 도메인: {{ nginx.domain }}"
+          - "📦 GCS 버킷: {{ gcp.gcs.fe.bucket_name }}"
+          - "🔗 CDN IP: {{ gcp.gcs.fe.cdn_ip }}"
+
+    - name: "🏗️ Frontend 빌드 및 배포"
+      include_role:
+        name: fe_gcs_deploy
+      vars:
+        # 로컬에서 빌드하고 GCS에 업로드
+        build_host: localhost
+
+    - name: "✅ 배포 완료 알림"
+      debug:
+        msg:
+          - "🎉 Frontend 배포가 완료되었습니다!"
+          - "🌍 사이트 URL: https://{{ nginx.domain }}"
+          - "📊 CDN IP: {{ gcp.gcs.fe.cdn_ip }}"
+          - "🔄 캐시 무효화도 완료되었습니다."

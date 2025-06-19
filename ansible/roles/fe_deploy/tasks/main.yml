@@ -37,7 +37,7 @@
 
 - name: Write build log manually
   copy:
-    dest: "{{ path.log }}/fe_moongsan.log"
+    dest: "{{ paths.log }}/fe_moongsan.log"
     content: |
       ===== STDOUT =====
       {{ fe_build_result.stdout }}
@@ -46,7 +46,7 @@
   become: true
 
 - name: Deploy built frontend to nginx
-  shell: rsync -av --delete "{{ project_paths.fe_repo }}/dist/" {{ path.nginx }}/
+  shell: rsync -av --delete "{{ project_paths.fe_repo }}/dist/" {{ paths.nginx }}/
   become: true
 
 - name: Health check for React frontend (via localhost)
@@ -62,7 +62,7 @@
   copy:
     dest: /etc/logrotate.d/frontend
     content: |
-      {{ path.log }}/fe_moongsan.log {
+      {{ paths.log }}/fe_moongsan.log {
           weekly
           rotate 4
           compress

@@ -50,27 +50,27 @@
 
 - name: Create log directory
   file:
-    path: "{{ path.log }}"
+    path: "{{ paths.log }}"
     state: directory
     mode: "0755"
   become: yes
-  when: path is defined and path.log is defined
+  when: paths is defined and paths.log is defined
 
 - name: Create backup directory
   file:
-    path: "{{ path.backup }}"
+    path: "{{ paths.backup }}"
     state: directory
     mode: "0755"
   become: yes
-  when: path is defined and path.backup is defined
+  when: paths is defined and paths.backup is defined
 
 - name: Create script directory
   file:
-    path: "{{ path.script }}"
+    path: "{{ paths.script }}"
     state: directory
     mode: "0755"
   become: yes
-  when: path is defined and path.script is defined
+  when: paths is defined and paths.script is defined
 
 - name: Set up logrotate for application logs
   template:

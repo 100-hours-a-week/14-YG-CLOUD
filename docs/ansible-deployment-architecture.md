@@ -15,7 +15,7 @@
 ### 인프라 구성
 - **Database 서버**: `test-database (10.0.0.2)`
 - **Backend 서버**: `test-backend (10.0.0.3)`  
-- **AI 서버**: `test-ai (10.0.0.5)`
+- **AI 서버**: `test-ai (10.0.0.4)`
 
 ## 서버별 Role 매핑
 
@@ -45,7 +45,7 @@
 - `redis-moongsan`: Redis 7.2 캐시 서버
 - `be-moongsan`: Spring Boot API 서버
 
-### 🤖 AI 서버 (test-ai - 10.0.0.5)
+### 🤖 AI 서버 (test-ai - 10.0.0.4)
 
 | 순서 | Role 명 | 설명 | 포트 | 태그 | 실행 조건 |
 |------|---------|------|------|------|-----------|
@@ -114,7 +114,7 @@ networks:
         │                          │
    ┌────▼────┐  ┌────▼────┐  ┌────▼────┐
    │Backend  │  │   AI    │  │Database │
-   │10.0.0.3 │  │10.0.0.5 │  │10.0.0.2 │
+   │10.0.0.3 │  │10.0.0.4 │  │10.0.0.2 │
    └────┬────┘  └────┬────┘  └────┬────┘
         │            │            │
    ┌────▼────┐  ┌────▼────┐       │
@@ -185,7 +185,7 @@ spring.redis.host: localhost  # Backend 서버 내부
 spring.redis.port: 6379
 
 # Backend → AI
-ai.service.url: http://10.0.0.5:8100/predict
+ai.service.url: http://10.0.0.4:8100/predict
 
 # AI → Database (필요시)
 database.url: mysql://10.0.0.2:3306/moongsan_test_db

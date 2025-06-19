@@ -43,9 +43,15 @@ variable "subnet_cidr" {
 }
 
 variable "wireguard_cidr" {
-  description = "CIDR block for WireGuard VPN"
+  description = "CIDR for WireGuard VPN network"
   type        = string
   default     = "10.8.0.0/24"
+}
+
+variable "shared_vpc_cidr" {
+  description = "CIDR block for shared VPC (for jumpbox access)"
+  type        = string
+  default     = "10.100.0.0/24"
 }
 
 variable "ssh_source_ranges" {

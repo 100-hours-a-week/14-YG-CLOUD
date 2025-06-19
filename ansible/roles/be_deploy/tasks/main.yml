@@ -1,13 +1,13 @@
 # 깃허브 repo에서 be를 clone
 - name: Remove existing BE repo completely
   file:
-    path: "{{ project_paths.be_repo }}"
+    path: /home/ubuntu/14-YG-BE
     state: absent
 
 - name: Fresh clone of be_deploy backend repository
   git:
-    repo: "{{ project_repos.be_url }}"
-    dest: "{{ project_paths.be_repo }}"
+    repo: https://github.com/100-hours-a-week/14-YG-BE.git
+    dest: /home/ubuntu/14-YG-BE
     version: "{{ branch }}"
     update: yes
     force: yes
@@ -15,7 +15,7 @@
 
 # be_deploy 레포의 소유권을 ubuntu로 변경
 - name: Mark be_deploy repo as safe for git
-  shell: git config --global --add safe.directory "{{ project_paths.be_repo }}"
+  shell: git config --global --add safe.directory /home/ubuntu/14-YG-BE
   become: false
   args:
     executable: /bin/bash
@@ -23,24 +23,24 @@
 # --- docker로 전환
 - name: Ensure envs directory for backend exists
   file:
-    path: "{{ path.secret }}"
+    path: "{{ paths.secret }}"
     state: directory
     mode: "0755"
-    owner: "{{ system.user }}"
-    group: "{{ system.user }}"
+    owner: ubuntu
+    group: ubuntu
 
 # 환경 변수 파일 생성
 - name: Generate .env.prod file from template
   template:
     src: env.prod.j2
-    dest: "{{ path.secret }}/backend.env.prod"
+    dest: "{{ paths.secret }}/backend.env.prod"
     mode: "0644"
-    owner: "{{ system.user }}"
-    group: "{{ system.user }}"
+    owner: ubuntu
+    group: ubuntu
 
 - name: Ensure CORS allows dev/test domains
   lineinfile:
-    path: "{{ project_paths.be_repo }}/src/main/java/com/moogsan/moongsan_backend/global/config/SecurityConfig.java"
+    path: /home/ubuntu/14-YG-BE/src/main/java/com/moogsan/moongsan_backend/global/config/SecurityConfig.java
     insertafter: '^\s*config\.setAllowedOrigins\(List\.of\($'
     line: '                "https://{{ nginx.domain }}",'
     state: present
@@ -55,10 +55,16 @@
   shell: docker builder prune -f
   become: true
 
+- name: Ensure Docker network moongsan-net exists
+  community.docker.docker_network:
+    name: moongsan-net
+    state: present
+  become: true
+
 - name: Get git commit hash for backend
   command: git rev-parse --short HEAD
   args:
-    chdir: "{{ project_paths.be_repo }}"
+    chdir: /home/ubuntu/14-YG-BE
   register: be_git_commit
 
 - name: Set be git commit fact
@@ -69,7 +75,7 @@
 - name: Copy Dockerfile to BE repo
   template:
     src: Dockerfile.j2
-    dest: "{{ project_paths.be_repo }}/Dockerfile"
+    dest: /home/ubuntu/14-YG-BE/Dockerfile
     mode: "0644"
   become: true
 
@@ -78,7 +84,7 @@
     docker build -t {{ be.image }}:{{ be.tag }}
     -f Dockerfile .
   args:
-    chdir: "{{ project_paths.be_repo }}"
+    chdir: /home/ubuntu/14-YG-BE
   become: true
 
 - name: DockerHub 로그인
@@ -101,10 +107,10 @@
 
 - name: Ensure logs directory exists
   file:
-    path: "{{ path.log }}"
+    path: "{{ paths.log }}"
     state: directory
-    owner: "{{ system.user }}"
-    group: "{{ system.user }}"
+    owner: ubuntu
+    group: ubuntu
     mode: "0755"
 
 - name: Run backend container
@@ -114,13 +120,13 @@
     state: started
     recreate: true # always recreate for fresh image
     restart_policy: unless-stopped
-    env_file: "{{ path.secret }}/backend.env.prod"
+    env_file: "{{ paths.secret }}/backend.env.prod"
     published_ports:
-      - "{{ be.port }}:{{ be.port }}"
+      - "{{ be.port }}:8080"
     volumes:
-      - "{{ path.log }}:{{ path.log }}"
+      - "{{ paths.log }}:{{ paths.log }}"
     networks:
-      - name: "{{ docker.network_name }}"
+      - name: moongsan-net
 
 - name: Remove dangling images after deployment
   shell: docker image prune -f
@@ -131,13 +137,13 @@
   copy:
     dest: /etc/logrotate.d/be_moongsan
     content: |
-      {{ path.log }}/be_moongsan.log {
+      {{ paths.log }}/be_moongsan.log {
           weekly
           rotate 4
           compress
           delaycompress
           missingok
           notifempty
-          create 0644 {{ system.user }} {{ system.user }}
+          create 0644 ubuntu ubuntu
       }
   become: true

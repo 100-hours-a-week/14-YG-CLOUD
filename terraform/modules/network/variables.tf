@@ -31,3 +31,9 @@ variable "ssh_source_ranges" {
   type        = list(string)
   default     = ["0.0.0.0/0"]
 }
+
+variable "shared_vpc_cidr" {
+  description = "CIDR block for shared VPC (for jumpbox access)"
+  type        = string
+  default     = "10.100.0.0/24"
+}

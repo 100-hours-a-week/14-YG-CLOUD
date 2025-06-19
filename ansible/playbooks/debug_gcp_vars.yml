@@ -1,0 +1,37 @@
+# GCP 변수 디버그 플레이북
+- name: "🔍 GCP 변수 디버그"
+  hosts: test
+  connection: local
+  gather_facts: no
+  run_once: true
+
+  tasks:
+    - name: "📋 GCP 인증 정보 출력"
+      debug:
+        msg:
+          - "프로젝트 ID: {{ gcp.credentials.project_id }}"
+          - "클라이언트 이메일: {{ gcp.credentials.client_email }}"
+          - "GCS 버킷: {{ gcp.gcs.fe.bucket_name }}"
+          - "GCS 프로젝트: {{ gcp.gcs.fe.project }}"
+
+    - name: "📄 템플릿 생성 테스트"
+      template:
+        src: "../roles/fe_gcs_deploy/templates/gcs-service-account.json.j2"
+        dest: "/tmp/gcs-test-credentials.json"
+        mode: "0600"
+      delegate_to: localhost
+
+    - name: "✅ 생성된 JSON 파일 확인"
+      shell: "head -10 /tmp/gcs-test-credentials.json"
+      delegate_to: localhost
+      register: json_content
+
+    - name: "📄 JSON 내용 출력"
+      debug:
+        msg: "{{ json_content.stdout_lines }}"
+
+    - name: "🧹 임시 파일 정리"
+      file:
+        path: "/tmp/gcs-test-credentials.json"
+        state: absent
+      delegate_to: localhost

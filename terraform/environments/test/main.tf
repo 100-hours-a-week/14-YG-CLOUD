@@ -26,6 +26,7 @@ module "network" {
   subnet_cidr       = var.subnet_cidr
   wireguard_cidr    = var.wireguard_cidr
   ssh_source_ranges = var.ssh_source_ranges
+  shared_vpc_cidr   = var.shared_vpc_cidr
 }
 
 # Jump Box는 shared 환경의 공유 jump box를 사용

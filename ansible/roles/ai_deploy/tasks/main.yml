@@ -59,17 +59,30 @@
   set_fact:
     git_commit: "{{ ai_git_commit.stdout }}"
 
+# 필요한 디렉토리들 생성
+- name: Ensure required directories exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ system.user }}"
+    group: "{{ system.user }}"
+    mode: "0755"
+  loop:
+    - "{{ paths.secret }}"
+    - "{{ paths.log }}"
+  become: true
+
 # 환경 변수 + GCP 서비스 계정 키 파일을 템플릿에서 생성
 - name: Generate .env file from template
   template:
     src: .env.j2
-    dest: "{{ path.secret }}/.env"
+    dest: "{{ paths.secret }}/.env"
     mode: "0644"
 
 - name: Generate GCP service account key file from template
   template:
     src: service-account.json.j2
-    dest: "{{ path.secret }}/{{ ai.gcp.credentials }}"
+    dest: "{{ paths.secret }}/{{ gcp.ai.credentials }}"
     mode: "0600"
 
 # build 전 캐시/이미지 정리
@@ -106,7 +119,7 @@
 
 - name: Ensure AI log directory exists
   file:
-    path: "{{ path.log }}"
+    path: "{{ paths.log }}"
     state: directory
     owner: "{{ system.user }}"
     group: "{{ system.user }}"
@@ -114,7 +127,7 @@
 
 - name: Create AI log file if missing
   file:
-    path: "{{ path.log }}/ai_moongsan.log"
+    path: "{{ paths.log }}/ai_moongsan.log"
     state: touch
     owner: "{{ system.user }}"
     group: "{{ system.user }}"
@@ -128,12 +141,12 @@
     state: started
     restart_policy: unless-stopped
     recreate: true
-    env_file: "{{ path.secret }}/.env"
+    env_file: "{{ paths.secret }}/.env"
     published_ports:
       - "{{ ai.port }}:{{ ai.port }}"
     volumes:
-      - "{{ path.log }}:{{ path.log }}"
-      - "{{ path.secret }}:{{ path.secret }}"
+      - "{{ paths.log }}:{{ paths.log }}"
+      - "{{ paths.secret }}:{{ paths.secret }}"
 
 - name: Remove dangling images after deployment
   shell: docker image prune -f
@@ -143,7 +156,7 @@
   copy:
     dest: /etc/logrotate.d/ai_moongsan
     content: |
-      {{ path.log }}/ai_moongsan.log {
+      {{ paths.log }}/ai_moongsan.log {
           weekly
           rotate 4
           compress
