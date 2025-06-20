@@ -10,7 +10,7 @@ resource "google_storage_bucket" "frontend_bucket" {
   
   website {
     main_page_suffix = "index.html"
-    not_found_page   = "404.html"
+    not_found_page   = "index.html"
   }
   
   cors {
@@ -70,16 +70,14 @@ resource "google_compute_url_map" "frontend_url_map" {
       service = google_compute_backend_bucket.frontend_backend.self_link
     }
     
-    # 루트는 index.html로 서빙
+    # SPA 경로들을 명시적으로 index.html로 라우팅
     path_rule {
-      paths   = ["/", "/index.html"]
+      paths = ["/", "/index.html", "/products", "/products/*", "/login", "/signup", "/mypage", "/chat", "/chat/*", "/writePost", "/editPost/*", "/signupInfo", "/editProfile", "/editPassword"]
       service = google_compute_backend_bucket.frontend_backend.self_link
-    }
-    
-    # SPA 라우팅: 모든 다른 경로를 index.html로 URL 리라이트
-    default_route_action {
-      url_rewrite {
-        path_prefix_rewrite = "/index.html"
+      route_action {
+        url_rewrite {
+          path_prefix_rewrite = "/index.html"
+        }
       }
     }
   }
