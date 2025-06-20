@@ -43,10 +43,46 @@ resource "google_compute_backend_bucket" "frontend_backend" {
   }
 }
 
-# Global HTTP(S) Load Balancer
+# Global HTTP(S) Load Balancer with SPA routing
 resource "google_compute_url_map" "frontend_url_map" {
   name            = "${var.project_name}-${var.env}-frontend-urlmap"
   default_service = google_compute_backend_bucket.frontend_backend.self_link
+  
+  # SPA 라우팅을 위한 호스트 규칙
+  host_rule {
+    hosts        = [var.domain_name]
+    path_matcher = "spa-routing"
+  }
+  
+  path_matcher {
+    name            = "spa-routing"
+    default_service = google_compute_backend_bucket.frontend_backend.self_link
+    
+    # 정적 자산들은 직접 서빙
+    path_rule {
+      paths   = ["/assets/*", "/static/*", "/icons/*", "/images/*", "/fonts/*", "/js/*", "/css/*"]
+      service = google_compute_backend_bucket.frontend_backend.self_link
+    }
+    
+    # 특정 파일들도 직접 서빙 (루트 레벨 파일들)
+    path_rule {
+      paths   = ["/favicon.ico", "/manifest.json", "/robots.txt"]
+      service = google_compute_backend_bucket.frontend_backend.self_link
+    }
+    
+    # 루트는 index.html로 서빙
+    path_rule {
+      paths   = ["/", "/index.html"]
+      service = google_compute_backend_bucket.frontend_backend.self_link
+    }
+    
+    # SPA 라우팅: 모든 다른 경로를 index.html로 URL 리라이트
+    default_route_action {
+      url_rewrite {
+        path_prefix_rewrite = "/index.html"
+      }
+    }
+  }
 }
 
 # HTTP(S) Proxy

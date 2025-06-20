@@ -197,6 +197,38 @@
   register: upload_result
   failed_when: upload_result.rc != 0
 
+- name: Create 404.html for SPA routing (copy of index.html)
+  shell: |
+    # 환경변수 설정 (db_backup과 동일 패턴)
+    export GOOGLE_APPLICATION_CREDENTIALS="{{ paths.secret }}/gcs-frontend-sa.json"
+    
+    BUILD_DIR="{{ project_paths.fe_repo }}/{{ fe.build.build_dir }}"
+    
+    echo "=== SPA 라우팅을 위한 404.html 생성 ==="
+    echo "React SPA에서는 모든 라우트가 index.html을 통해 처리되어야 합니다."
+    
+    # index.html을 404.html로 복사 (로컬에서)
+    if [ -f "$BUILD_DIR/index.html" ]; then
+      cp "$BUILD_DIR/index.html" "$BUILD_DIR/404.html"
+      echo "✅ 404.html 생성 완료 (index.html 복사)"
+      
+      # 404.html을 GCS에 업로드
+      gsutil -o "Credentials:gs_service_key_file={{ paths.secret }}/gcs-frontend-sa.json" \
+             cp "$BUILD_DIR/404.html" "gs://{{ gcp.gcs.fe.bucket_name }}/404.html"
+      echo "✅ 404.html GCS 업로드 완료"
+      
+      # 업로드 확인
+      echo "=== 404.html 업로드 확인 ==="
+      gsutil -o "Credentials:gs_service_key_file={{ paths.secret }}/gcs-frontend-sa.json" \
+             stat "gs://{{ gcp.gcs.fe.bucket_name }}/404.html"
+    else
+      echo "❌ index.html 파일을 찾을 수 없습니다: $BUILD_DIR/index.html"
+      exit 1
+    fi
+  become: false
+  register: spa_routing_result
+  failed_when: spa_routing_result.rc != 0
+
 - name: Invalidate CDN cache for immediate deployment
   shell: |
     # 환경변수 설정 (db_backup과 동일 패턴)
