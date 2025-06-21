@@ -41,3 +41,14 @@ variable "ssl_domains" {
   type        = list(string)
   default     = []
 }
+
+# Option 4: GCS CDN Backend 관련 변수들
+variable "gcs_bucket_name" {
+  description = "프론트엔드 정적 파일이 저장된 GCS 버킷 이름"
+  type        = string
+}
+
+variable "domain_name" {
+  description = "메인 도메인 이름 (SSL 인증서 및 라우팅용)"
+  type        = string
+}

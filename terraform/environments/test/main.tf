@@ -32,7 +32,7 @@ module "network" {
 # Jump Box는 shared 환경의 공유 jump box를 사용
 # 별도의 test jump box는 생성하지 않음
 
-# GCS + CDN for Frontend Static Hosting
+# GCS 정적 호스팅 (Option 4: 버킷만 생성)
 module "frontend_hosting" {
   source = "../../modules/gcs_cdn"
 
@@ -107,7 +107,7 @@ module "database" {
   # startup_script 제거 - Ansible로 애플리케이션 설정 관리
 }
 
-# Load Balancer - 3-tier 아키텍처 완성
+# Load Balancer - Option 4: 통합 구조 (정적 + 동적 콘텐츠)
 module "load_balancer" {
   source = "../../modules/load_balancer"
 
@@ -117,6 +117,28 @@ module "load_balancer" {
   network_self_link   = module.network.vpc_self_link
   backend_instances   = [module.backend.self_link]
   ai_instances        = [module.ai.self_link]
-  enable_https        = false  # 초기에는 HTTP만 사용
-  ssl_domains         = []
+  enable_https        = true  # HTTPS 활성화
+  ssl_domains         = [var.domain_name]
+  
+  # Option 4: GCS 연결
+  gcs_bucket_name     = module.frontend_hosting.bucket_name
+  domain_name         = var.domain_name
+}
+
+# GCP Health Check를 위한 방화벽 규칙
+resource "google_compute_firewall" "allow_health_check" {
+  name    = "allow-health-check"
+  network = module.network.vpc_name
+
+  allow {
+    protocol = "tcp"
+    ports    = ["8080", "8100"]  # Backend와 AI 포트 모두 포함
+  }
+
+  source_ranges = [
+    "130.211.0.0/22",  # GCP Health Check IP ranges
+    "35.191.0.0/16"
+  ]
+
+  target_tags = ["internal"]  # 백엔드 서버는 internal 태그를 가지고 있음
 }

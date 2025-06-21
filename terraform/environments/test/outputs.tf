@@ -1,10 +1,11 @@
+# Frontend hosting information (Option 4)
 output "frontend_hosting" {
   description = "Frontend hosting information"
   value = {
-    bucket_name = module.frontend_hosting.bucket_name
-    cdn_ip      = module.frontend_hosting.cdn_ip_address
-    url         = module.frontend_hosting.frontend_url
-    upload_cmd  = module.frontend_hosting.upload_instructions
+    bucket_name    = module.frontend_hosting.bucket_name
+    upload_cmd     = module.frontend_hosting.upload_instructions
+    main_url       = module.load_balancer.frontend_url
+    main_ip        = module.load_balancer.main_ip_address
   }
 }
 
@@ -28,20 +29,15 @@ output "vm_internal_ips" {
   }
 }
 
-# WireGuard 클라이언트 설정 파일들 - Ansible로 관리됨
-# output "wireguard_client_configs" {
-#   description = "WireGuard client configuration files"
-#   value       = module.wireguard.client_configs
-#   sensitive   = true
-# }
-
-# Load Balancer 정보
+# Load Balancer 정보 (Option 4)
 output "load_balancer" {
-  description = "Load Balancer information"
+  description = "Main Load Balancer information (Option 4)"
   value = {
-    external_ip = module.load_balancer.load_balancer_ip
-    backend_url = "http://${module.load_balancer.load_balancer_ip}/api"
-    ai_url      = "http://${module.load_balancer.load_balancer_ip}/generation"
+    main_ip       = module.load_balancer.main_ip_address
+    frontend_url  = module.load_balancer.frontend_url
+    backend_url   = "${module.load_balancer.frontend_url}/api"
+    ai_url        = "${module.load_balancer.frontend_url}/generation"
+    ssl_cert_id   = module.load_balancer.ssl_certificate_id
   }
 }
 

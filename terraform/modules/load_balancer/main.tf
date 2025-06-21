@@ -1,10 +1,25 @@
-# Load Balancer 모듈 - HTTP/HTTPS 로드밸런서
+# Load Balancer 모듈 - HTTP/HTTPS 로드밸런서 (Option 4: 통합 구조)
 
 # 글로벌 외부 IP 주소
-resource "google_compute_global_address" "lb_ip" {
-  name         = "${var.project_name}-${var.env}-lb-ip"
+resource "google_compute_global_address" "main_ip" {
+  name         = "${var.project_name}-${var.env}-main-ip"
   ip_version   = "IPV4"
   address_type = "EXTERNAL"
+}
+
+# Option 4: GCS CDN Backend Bucket (정적 파일용)
+resource "google_compute_backend_bucket" "frontend_cdn" {
+  name        = "${var.project_name}-${var.env}-frontend-cdn"
+  bucket_name = var.gcs_bucket_name
+  enable_cdn  = true
+  
+  cdn_policy {
+    cache_mode                   = "CACHE_ALL_STATIC"
+    default_ttl                 = 3600
+    max_ttl                     = 86400
+    negative_caching            = true
+    serve_while_stale           = 86400
+  }
 }
 
 # 인스턴스 그룹 (Unmanaged) - Backend 서버용
@@ -47,7 +62,7 @@ resource "google_compute_health_check" "backend_health_check" {
 
   http_health_check {
     port               = 8080
-    request_path       = "/health"  # Backend에 헬스 체크 엔드포인트 필요
+    request_path       = "/api/group-buys"  # Backend API 엔드포인트 사용
     proxy_header       = "NONE"
   }
 }
@@ -107,76 +122,102 @@ resource "google_compute_backend_service" "ai_service" {
   health_checks = [google_compute_health_check.ai_health_check.id]
 }
 
-# URL 맵 - 라우팅 규칙
-resource "google_compute_url_map" "lb_url_map" {
-  name            = "${var.project_name}-${var.env}-lb-url-map"
-  description     = "URL map for routing traffic"
-  default_service = google_compute_backend_service.backend_service.id
+# Option 4: 통합 URL 맵 - 정적/동적 콘텐츠 모두 처리
+resource "google_compute_url_map" "main_url_map" {
+  name            = "${var.project_name}-${var.env}-main-url-map"
+  description     = "Main URL map for routing all traffic (Option 4)"
+  default_service = google_compute_backend_bucket.frontend_cdn.self_link
 
+  # 도메인별 라우팅
+  host_rule {
+    hosts        = [var.domain_name]
+    path_matcher = "main-routing"
+  }
+  
   path_matcher {
-    name            = "allpaths"
-    default_service = google_compute_backend_service.backend_service.id
-
+    name            = "main-routing"
+    default_service = google_compute_backend_bucket.frontend_cdn.self_link
+    
+    # API 경로 - Backend Service로 라우팅
     path_rule {
       paths   = ["/api/*"]
-      service = google_compute_backend_service.backend_service.id
+      service = google_compute_backend_service.backend_service.self_link
     }
-
+    
+    # AI/Generation 경로 - AI Service로 라우팅  
     path_rule {
-      paths   = ["/generation/*"]
-      service = google_compute_backend_service.ai_service.id
+      paths   = ["/generation/*", "/generate/*"]
+      service = google_compute_backend_service.ai_service.self_link
+    }
+    
+    # 정적 자산들은 CDN으로 (명시적)
+    path_rule {
+      paths   = ["/assets/*", "/static/*", "/icons/*", "/images/*", "/fonts/*", "/js/*", "/css/*"]
+      service = google_compute_backend_bucket.frontend_cdn.self_link
+    }
+    
+    # 특정 파일들도 CDN으로
+    path_rule {
+      paths   = ["/favicon.ico", "/manifest.json", "/robots.txt"]
+      service = google_compute_backend_bucket.frontend_cdn.self_link
+    }
+    
+    # SPA 경로들을 명시적으로 index.html로 라우팅 (CDN 캐시 활용)
+    path_rule {
+      paths = ["/", "/index.html", "/products", "/products/*", "/login", "/signup", "/mypage", "/chat", "/chat/*", "/writePost", "/editPost/*", "/signupInfo", "/editProfile", "/editPassword"]
+      service = google_compute_backend_bucket.frontend_cdn.self_link
+      route_action {
+        url_rewrite {
+          path_prefix_rewrite = "/index.html"
+        }
+      }
     }
   }
-
-  host_rule {
-    hosts        = ["*"]
-    path_matcher = "allpaths"
-  }
 }
 
-# HTTP 프록시
-resource "google_compute_target_http_proxy" "lb_http_proxy" {
-  name   = "${var.project_name}-${var.env}-lb-http-proxy"
-  url_map = google_compute_url_map.lb_url_map.id
-}
-
-# 글로벌 포워딩 규칙 (HTTP)
-resource "google_compute_global_forwarding_rule" "lb_forwarding_rule" {
-  name                  = "${var.project_name}-${var.env}-lb-forwarding-rule"
-  description           = "Global forwarding rule for HTTP traffic"
-  ip_protocol           = "TCP"
-  load_balancing_scheme = "EXTERNAL"
-  port_range            = "80"
-  target                = google_compute_target_http_proxy.lb_http_proxy.id
-  ip_address            = google_compute_global_address.lb_ip.id
-}
-
-# HTTPS 지원을 위한 SSL 인증서 (선택사항)
-resource "google_compute_managed_ssl_certificate" "lb_ssl_cert" {
-  count = var.enable_https ? 1 : 0
-  name  = "${var.project_name}-${var.env}-lb-ssl-cert"
+# SSL 인증서 (HTTPS 지원)
+resource "google_compute_managed_ssl_certificate" "main_ssl_cert" {
+  name = "${var.project_name}-${var.env}-main-ssl-cert"
 
   managed {
-    domains = var.ssl_domains
+    domains = [var.domain_name]
   }
 }
 
-# HTTPS 프록시 (선택사항)
-resource "google_compute_target_https_proxy" "lb_https_proxy" {
-  count           = var.enable_https ? 1 : 0
-  name            = "${var.project_name}-${var.env}-lb-https-proxy"
-  url_map         = google_compute_url_map.lb_url_map.id
-  ssl_certificates = [google_compute_managed_ssl_certificate.lb_ssl_cert[0].id]
+# HTTPS 프록시 (메인)
+resource "google_compute_target_https_proxy" "main_https_proxy" {
+  name            = "${var.project_name}-${var.env}-main-https-proxy"
+  url_map         = google_compute_url_map.main_url_map.self_link
+  ssl_certificates = [google_compute_managed_ssl_certificate.main_ssl_cert.self_link]
 }
 
-# HTTPS 포워딩 규칙 (선택사항)
-resource "google_compute_global_forwarding_rule" "lb_https_forwarding_rule" {
-  count                 = var.enable_https ? 1 : 0
-  name                  = "${var.project_name}-${var.env}-lb-https-forwarding-rule"
-  description           = "Global forwarding rule for HTTPS traffic"
-  ip_protocol           = "TCP"
-  load_balancing_scheme = "EXTERNAL"
-  port_range            = "443"
-  target                = google_compute_target_https_proxy.lb_https_proxy[0].id
-  ip_address            = google_compute_global_address.lb_ip.id
+# HTTPS 포워딩 규칙 (메인)
+resource "google_compute_global_forwarding_rule" "main_https_forwarding_rule" {
+  name       = "${var.project_name}-${var.env}-main-https-forwarding-rule"
+  target     = google_compute_target_https_proxy.main_https_proxy.self_link
+  port_range = "443"
+  ip_address = google_compute_global_address.main_ip.address
+}
+
+# HTTP to HTTPS redirect
+resource "google_compute_url_map" "http_redirect" {
+  name = "${var.project_name}-${var.env}-http-redirect"
+  
+  default_url_redirect {
+    https_redirect         = true
+    redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
+    strip_query            = false
+  }
+}
+
+resource "google_compute_target_http_proxy" "main_http_proxy" {
+  name    = "${var.project_name}-${var.env}-main-http-proxy"
+  url_map = google_compute_url_map.http_redirect.self_link
+}
+
+resource "google_compute_global_forwarding_rule" "main_http_forwarding_rule" {
+  name       = "${var.project_name}-${var.env}-main-http-forwarding-rule"
+  target     = google_compute_target_http_proxy.main_http_proxy.self_link
+  port_range = "80"
+  ip_address = google_compute_global_address.main_ip.address
 }
