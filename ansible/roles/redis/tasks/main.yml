@@ -1,10 +1,101 @@
-- name: Redis Container
+---
+# Redis Master Mode Setup
+# Ensures Redis starts as master, not replica
+
+- name: "Create Redis configuration directory"
+  file:
+    path: "{{ db.redis.container.config_dir }}"
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: "Create Redis data directory"
+  file:
+    path: "{{ db.redis.container.data_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  become: true
+
+- name: "Generate Redis configuration for master mode"
+  template:
+    src: redis.conf.j2
+    dest: "{{ db.redis.container.config_dir }}/redis.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+
+- name: "Stop and remove any existing Redis container"
+  docker_container:
+    name: "{{ db.redis.container_name }}"
+    state: absent
+  become: true
+  ignore_errors: yes
+
+- name: "Start Redis container with custom configuration (Master Mode)"
   community.docker.docker_container:
-    name: "{{ redis.host }}"
-    image: "{{ redis.image }}"
+    name: "{{ db.redis.container_name }}"
+    image: "{{ db.redis.image }}"
     state: started
     restart_policy: always
     networks:
       - name: "{{ docker.network_name }}"
     published_ports:
-      - "{{ redis.port }}:{{ redis.port }}"
+      - "{{ db.redis.port }}:{{ db.redis.port }}"
+    volumes:
+      - "{{ db.redis.container.data_dir }}:/data"
+      - "{{ db.redis.container.config_dir }}/redis.conf:{{ db.redis.container.config_file }}:ro"
+    command: ["redis-server", "{{ db.redis.container.config_file }}"]
+  become: true
+
+- name: "Wait for Redis to be ready"
+  wait_for:
+    port: "{{ db.redis.port }}"
+    host: "localhost"
+    delay: 5
+    timeout: 60
+
+- name: "Check Redis connection"
+  shell: |
+    docker exec {{ db.redis.container_name }} redis-cli ping
+  register: redis_ping_check
+  become: true
+  retries: 3
+  delay: 2
+
+- name: "Verify Redis is running as master"
+  shell: |
+    docker exec {{ db.redis.container_name }} redis-cli INFO replication | grep "role:master"
+  register: redis_master_check
+  become: true
+  ignore_errors: yes
+
+- name: "Display Redis replication status"
+  debug:
+    msg: "{{ '✅ Redis is running as: MASTER' if redis_master_check.rc == 0 else '⚠️  Redis is running as: REPLICA (will be converted to master)' }}"
+
+- name: "Force Redis to master mode if needed"
+  shell: |
+    docker exec {{ db.redis.container_name }} redis-cli REPLICAOF NO ONE
+  become: true
+  when: redis_master_check.rc != 0
+  register: redis_master_conversion
+
+- name: "Wait after master conversion"
+  pause:
+    seconds: 3
+  when: redis_master_check.rc != 0
+
+- name: "Final verification - Check Redis master status"
+  shell: |
+    docker exec {{ db.redis.container_name }} redis-cli INFO replication
+  register: redis_final_status
+  become: true
+
+- name: "Display final Redis status"
+  debug:
+    msg: 
+      - "🔧 Redis Final Status:"
+      - "{{ redis_final_status.stdout_lines }}"

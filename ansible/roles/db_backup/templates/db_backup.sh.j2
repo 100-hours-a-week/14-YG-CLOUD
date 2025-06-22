@@ -9,7 +9,7 @@ export GOOGLE_APPLICATION_CREDENTIALS="{{ paths.secret }}/my-gcs-key.json"
 
 # DB 백업
 DATE=$(date +%F-%H-%M)
-DB_PASS="{{ db.root_password }}"
+DB_PASS="{{ db.mysql.root_password }}"
 BACKUP_FILE="{{ paths.backup }}/moongsan_{{ env }}_db_${DATE}.sql"
 GCS_PATH="gs://{{ gcp.gcs.backup.name }}/{{ env }}/db/"
 

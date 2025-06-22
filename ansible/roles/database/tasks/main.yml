@@ -2,76 +2,25 @@
 # Docker-based MySQL Database Setup
 # 3-tier 아키텍처용 MySQL 데이터베이스 컨테이너 배포
 
-- name: "Clean up Docker repository conflicts"
-  shell: |
-    rm -f /etc/apt/sources.list.d/docker.list
-    rm -f /etc/apt/keyrings/docker.asc
-    rm -f /etc/apt/keyrings/docker.gpg
-  become: true
-  ignore_errors: yes
-
-- name: "Remove conflicting packages"
-  apt:
-    name:
-      - containerd.io
-      - docker-ce
-      - docker-ce-cli
-      - docker-buildx-plugin
-      - docker-compose-plugin
-    state: absent
-    purge: yes
-  become: true
-  ignore_errors: yes
-
-- name: "Update package cache after cleanup"
-  apt:
-    update_cache: yes
-    cache_valid_time: 0
+- name: "Create MySQL configuration directory"
+  file:
+    path: "{{ db.mysql.container.config_dir }}"
+    state: directory
+    mode: '0755'
   become: true
 
-- name: "Install Docker from Ubuntu repositories"
-  apt:
-    name:
-      - docker.io
-      - docker-compose
-      - python3-pip
-    state: present
-    force: yes
-  become: true
-
-- name: "Install Docker Python module"
-  pip:
-    name: 
-      - docker
-      - docker-compose
-    executable: pip3
-  become: true
-
-- name: "Start and enable Docker service"
-  systemd:
-    name: docker
-    state: started
-    enabled: yes
-  become: true
-
-- name: "Add user to docker group"
-  user:
-    name: "{{ ansible_user }}"
-    groups: docker
-    append: yes
-  become: true
-
-- name: "Create Docker network"
-  docker_network:
-    name: "{{ docker.network_name | default('moongsan-net') }}"
-    driver: "{{ docker.network_driver | default('bridge') }}"
-    ipam_config:
-      - subnet: "{{ docker.network_subnet | default('172.20.0.0/16') }}"
+- name: "Create MySQL custom configuration for long polling support"
+  template:
+    src: my.cnf.j2
+    dest: "{{ db.mysql.container.config_dir }}/custom.cnf"
+    owner: root
+    group: root
+    mode: '0644'
   become: true
 
 - name: "Create MySQL data directory"
   file:
-    path: "/var/lib/mysql-data"
+    path: "{{ db.mysql.container.data_dir }}"
     state: directory
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
@@ -106,39 +55,76 @@
   become: true
   ignore_errors: yes
 
-- name: "Run MySQL container"
+- name: "Run MySQL container with custom configuration"
   docker_container:
-    name: "mysql-{{ service_name }}"
-    image: "mysql:8.0"
+    name: "{{ db.mysql.container.name }}"
+    image: "{{ db.mysql.container.image }}"
     state: started
-    restart_policy: always
+    restart_policy: "{{ db.mysql.container.restart_policy }}"
     ports:
-      - "3306:3306"
+      - "{{ db.mysql.port }}:3306"
     volumes:
-      - "/var/lib/mysql-data:/var/lib/mysql"
+      - "{{ db.mysql.container.data_dir }}:/var/lib/mysql"
+      - "{{ db.mysql.container.config_dir }}/custom.cnf:/etc/mysql/conf.d/custom.cnf:ro"
     networks:
-      - name: "{{ docker.network_name | default('moongsan-net') }}"
+      - name: "{{ docker.network_name }}"
     env:
-      MYSQL_ROOT_PASSWORD: "{{ db.root_password | default('pass') }}"
-      MYSQL_DATABASE: "{{ database.name | default('moongsan_app') }}"
-      MYSQL_USER: "{{ db.user | default('moongsan_admin') }}"
-      MYSQL_PASSWORD: "{{ db.password | default('N4pT!6xuV2#rLm3z') }}"
+      MYSQL_ROOT_PASSWORD: "{{ db.mysql.root_password }}"
+      MYSQL_DATABASE: "{{ database.name | default(db.mysql.name) }}"
+      MYSQL_USER: "{{ db.mysql.user }}"
+      MYSQL_PASSWORD: "{{ db.mysql.password }}"
       TZ: "{{ system.timezone | default('Asia/Seoul') }}"
   become: true
 
 - name: "Wait for MySQL to be ready"
   wait_for:
-    port: "{{ db.port | default('3306') }}"
+    port: "{{ db.mysql.port | default('3306') }}"
     host: "{{ internal_ips.database | default('10.0.0.2') }}"
     delay: 10
     timeout: 300
 
 - name: "Verify MySQL container is running"
   docker_container_info:
-    name: "mysql-{{ service_name }}"
-  register: mysql_container
+    name: "{{ db.mysql.container.name }}"
+  register: mysql_container_info
   become: true
 
 - name: "Display MySQL container status"
   debug:
-    msg: "✅ MySQL container is {{ 'running' if mysql_container.container.State.Running else 'not running' }}"
+    msg: "✅ MySQL container is {{ 'running' if mysql_container_info.container.State.Running else 'not running' }}"
+
+- name: "Wait for MySQL configuration to be loaded"
+  pause:
+    seconds: 15
+  when: mysql_container_info.container.State.Running
+
+- name: "Verify max_connections setting"
+  shell: |
+    docker exec {{ db.mysql.container.name }} mysql -u {{ db.mysql.root_user }} -p{{ db.mysql.root_password }} \
+    -e "SHOW VARIABLES LIKE 'max_connections';"
+  register: max_connections_result
+  become: true
+  ignore_errors: yes
+
+- name: "Display max_connections setting"
+  debug:
+    msg: 
+      - "🔧 MySQL max_connections 설정 확인:"
+      - "{{ max_connections_result.stdout_lines if max_connections_result.stdout_lines is defined else 'Configuration check failed' }}"
+
+- name: "Show current MySQL connection status"
+  shell: |
+    docker exec {{ db.mysql.container.name }} mysql -u {{ db.mysql.root_user }} -p{{ db.mysql.root_password }} \
+    -e "SHOW STATUS LIKE 'Threads_connected';" \
+    -e "SHOW STATUS LIKE 'Max_used_connections';"
+  register: connection_status_result
+  become: true
+  ignore_errors: yes
+
+- name: "Display connection status"
+  debug:
+    msg: 
+      - "📊 MySQL 연결 상태:"
+      - "{{ connection_status_result.stdout_lines if connection_status_result.stdout_lines is defined else 'Status check failed' }}"
+
+

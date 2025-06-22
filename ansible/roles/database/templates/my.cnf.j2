@@ -1,0 +1,49 @@
+[mysqld]
+# Connection settings - Long polling support
+max_connections = {{ db.mysql.performance.max_connections }}
+max_connect_errors = {{ db.mysql.performance.max_connect_errors }}
+connect_timeout = {{ db.mysql.performance.connect_timeout }}
+wait_timeout = {{ db.mysql.performance.wait_timeout }}
+interactive_timeout = {{ db.mysql.performance.interactive_timeout }}
+
+# Character set
+character-set-server = {{ db.mysql.charset.server }}
+collation-server = {{ db.mysql.charset.collation }}
+
+# InnoDB settings
+innodb_buffer_pool_size = {{ db.mysql.innodb.buffer_pool_size }}
+innodb_log_file_size = {{ db.mysql.innodb.log_file_size }}
+innodb_flush_method = {{ db.mysql.innodb.flush_method }}
+innodb_lock_wait_timeout = {{ db.mysql.innodb.lock_wait_timeout }}
+
+# Logging
+log-error = {{ db.mysql.logging.error_log }}
+slow-query-log = {{ db.mysql.logging.slow_query_log }}
+slow-query-log-file = {{ db.mysql.logging.slow_query_log_file }}
+long_query_time = {{ db.mysql.logging.long_query_time }}
+
+# Binary logging for replication
+server-id = {{ db.mysql.replication.server_id }}
+log-bin = {{ db.mysql.replication.log_bin }}
+binlog_format = {{ db.mysql.replication.binlog_format }}
+
+# Security
+skip-name-resolve
+sql_mode = {{ db.mysql.security.sql_mode }}
+
+# Performance tuning
+table_open_cache = {{ db.mysql.performance.table_open_cache }}
+table_definition_cache = {{ db.mysql.performance.table_definition_cache }}
+tmp_table_size = {{ db.mysql.performance.tmp_table_size }}
+max_heap_table_size = {{ db.mysql.performance.max_heap_table_size }}
+
+# Thread settings
+thread_cache_size = {{ db.mysql.performance.thread_cache_size }}
+thread_stack = {{ db.mysql.performance.thread_stack }}
+
+# Network settings
+max_allowed_packet = {{ db.mysql.network.max_allowed_packet }}
+bind-address = {{ db.mysql.network.bind_address }}
+
+# Timezone
+default-time-zone = '{{ db.mysql.timezone }}'
