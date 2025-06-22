@@ -8,7 +8,5 @@ terraform {
   backend "gcs" {
     bucket = "ktb-2-moongsan-terraform-state"
     prefix = "environments/prod"
-    # KMS 암호화 (선택사항)
-    encryption_key = "projects/ktb-2-moongsan/locations/asia-northeast3/keyRings/terraform-state/cryptoKeys/terraform-state-key"
   }
 }
