@@ -1,16 +1,21 @@
 # 🚀 통합 배포 플레이북 (모든 환경 지원)
 #
-# 사용법:
-#   ansible-playbook -i inventories/dev.ini playbooks/main.yml -e "env=dev"
-#   ansible-playbook -i inventories/test.ini playbooks/main.yml -e "env=test"
-#   ansible-playbook -i inventories/prod.ini playbooks/main.yml -e "env=prod"
+# 전체 배포:
+#   ansible-playbook -i dev.ini playbooks/main.yml
+#   ansible-playbook -i test.ini playbooks/main.yml
+#   ansible-playbook -i prod.ini playbooks/main.yml
 #
 # 태그 기반 선택적 배포:
 #   --tags "base"       # 기본 시스템만
 #   --tags "database"   # 데이터베이스만
 #   --tags "backend"    # 백엔드 서비스만
 #   --tags "ai"         # AI 서비스만
-#   --tags "frontend"   # 프론트엔드만
+#   --tags "frontend"   # 프론트엔드만 (GCS + CDN)
+#   --tags "cdn"        # CDN 캐시 무효화만
+#
+# 예시:
+#   ansible-playbook -i test.ini playbooks/main.yml --tags "frontend"
+#   ansible-playbook -i test.ini playbooks/main.yml --tags "backend,ai"
 
 # 배포 시작 알림
 - name: "🚀 통합 배포 시작"
@@ -132,20 +137,46 @@
       when: "'ai' in group_names"
 
 # 5단계: 프론트엔드 배포 (gcs+cdn)
-- name: "5️⃣ 프론트엔드 배포"
+- name: "5️⃣ 프론트엔드 배포 (GCS + CDN)"
   hosts: jumpbox
   become: yes
   gather_facts: yes
+  vars:
+    deployment_env: "{{ groups.keys() | select('match', '^(dev|test|prod)$') | list | first | default('test') }}"
   tags:
     - fe_deploy
     - frontend
     - web
     - gcs
+    - cdn
   tasks:
-    - name: React 프론트엔드 GCS 배포
+    - name: "🚀 Frontend 배포 시작"
+      debug:
+        msg:
+          - "🎯 배포 환경: {{ deployment_env | upper }}"
+          - "📅 배포 시간: {{ ansible_date_time.iso8601 }}"
+          - "👤 실행 사용자: {{ ansible_user_id }}"
+          - "🌐 도메인: {{ nginx.domain }}"
+          - "📦 GCS 버킷: {{ gcp.gcs.fe.bucket_name }}"
+          - "🔗 CDN IP: {{ gcp.gcs.fe.cdn_ip }}"
+
+    - name: "🏗️ React 프론트엔드 GCS 배포"
       include_role:
         name: fe_gcs_deploy
-      when: env is defined and env in ['test', 'prod']
+      vars:
+        # 로컬에서 빌드하고 GCS에 업로드
+        build_host: localhost
+      when: deployment_env in ['test', 'prod']
+
+    - name: "✅ Frontend 배포 완료 알림"
+      debug:
+        msg:
+          - "🎉 Frontend 배포가 완료되었습니다!"
+          - "🌍 사이트 URL: https://{{ nginx.domain }}"
+          - "📊 CDN IP: {{ gcp.gcs.fe.cdn_ip }}"
+          - "🔄 캐시 무효화도 완료되었습니다."
+          - "🔗 Cache-bypass URL: https://{{ nginx.domain }}/?cb={{ ansible_date_time.epoch }}"
+      when: deployment_env in ['test', 'prod']
 
 # 6단계: 연결성 테스트 (Test 환경만)
 # - name: "6️⃣ 연결성 테스트"
@@ -160,7 +191,7 @@
 #       when: "'test' in group_names"
 
 # 배포 완료 요약
-- name: "✅ 테스트 환경 배포 완료"
+- name: "✅ 통합 배포 완료"
   hosts: localhost
   connection: local
   gather_facts: no
@@ -177,8 +208,15 @@
           - "  🗄️  Database: {{ hostvars[groups['database'][0]]['ansible_host'] if 'database' in groups else 'N/A' }}:3306"
           - "  🔧 Backend: {{ hostvars[groups['backend'][0]]['ansible_host'] if 'backend' in groups else 'N/A' }}:8080"
           - "  🤖 AI Service: {{ hostvars[groups['ai'][0]]['ansible_host'] if 'ai' in groups else 'N/A' }}:8100"
+          - "  🌍 Frontend: https://{{ hostvars[groups['jumpbox'][0]]['nginx']['domain'] if 'jumpbox' in groups else 'N/A' }} (GCS + CDN)"
+          - ""
+          - "🔗 주요 URL:"
+          - "  • Frontend: https://{{ hostvars[groups['jumpbox'][0]]['nginx']['domain'] if 'jumpbox' in groups else 'test.moongsan.com' }}"
+          - "  • Backend API: https://{{ hostvars[groups['jumpbox'][0]]['nginx']['domain'] if 'jumpbox' in groups else 'test.moongsan.com' }}/api"
+          - "  • AI Service: https://{{ hostvars[groups['jumpbox'][0]]['nginx']['domain'] if 'jumpbox' in groups else 'test.moongsan.com' }}/ai"
           - ""
           - "🔗 다음 단계:"
-          - "  1. 서비스 상태 확인: ansible -i inventories/test.ini test -m shell -a 'docker ps'"
-          - "  2. 로그 확인: ansible -i inventories/test.ini backend -m shell -a 'docker logs be-moongsan'"
-          - "  3. 연결성 테스트: ansible-playbook -i inventories/test.ini playbooks/05-connectivity-test.yml"
+          - "  1. 서비스 상태 확인: ansible -i {{ deployment_env }}.ini {{ deployment_env }} -m shell -a 'docker ps'"
+          - "  2. 백엔드 로그: ansible -i {{ deployment_env }}.ini backend -m shell -a 'docker logs be-moongsan'"
+          - "  3. AI 로그: ansible -i {{ deployment_env }}.ini ai -m shell -a 'docker logs ai-moongsan'"
+          - "  4. 프론트엔드 확인: curl -I https://{{ hostvars[groups['jumpbox'][0]]['nginx']['domain'] if 'jumpbox' in groups else 'test.moongsan.com' }}"

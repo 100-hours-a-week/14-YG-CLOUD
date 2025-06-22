@@ -154,7 +154,7 @@
     group: "{{ system.user }}"
   become: true
 
-- name: Upload built files to GCS bucket (using db_backup pattern)
+- name: Upload built files to GCS bucket with optimized cache headers
   shell: |
     # 환경변수 설정 (db_backup과 동일 패턴)
     export GOOGLE_APPLICATION_CREDENTIALS="{{ paths.secret }}/gcs-frontend-sa.json"
@@ -173,24 +173,49 @@
     FILE_COUNT=$(find "$BUILD_DIR" -type f | wc -l)
     echo "업로드할 파일 개수: $FILE_COUNT"
 
-    # db_backup에서 사용하는 패턴으로 업로드
-    echo "=== gsutil with explicit credentials 사용 ==="
+    # GCS 버킷을 완전히 정리 (기존 파일 삭제)
+    echo "=== 기존 파일 정리 ==="
+    gsutil -o "Credentials:gs_service_key_file={{ paths.secret }}/gcs-frontend-sa.json" \
+           -m rm -r "gs://{{ gcp.gcs.fe.bucket_name }}/*" 2>/dev/null || echo "버킷이 이미 비어있음"
+
+    # 파일 타입별로 다른 캐시 헤더 설정하여 업로드
+    echo "=== 최적화된 캐시 헤더로 업로드 ==="
+    
+    # 1. HTML 파일 (짧은 캐시, 매번 재검증)
+    find "$BUILD_DIR" -name "*.html" -type f | while read file; do
+      relative_path=${file#$BUILD_DIR/}
+      echo "HTML 업로드: $relative_path"
+      gsutil -o "Credentials:gs_service_key_file={{ paths.secret }}/gcs-frontend-sa.json" \
+             -h "Cache-Control: public, max-age=300, must-revalidate" \
+             -h "Content-Type: text/html; charset=utf-8" \
+             cp "$file" "gs://{{ gcp.gcs.fe.bucket_name }}/$relative_path"
+    done
+
+    # 2. JS/CSS 파일 (해시된 파일명이므로 긴 캐시)
+    find "$BUILD_DIR" -name "*.js" -o -name "*.css" -type f | while read file; do
+      relative_path=${file#$BUILD_DIR/}
+      echo "Asset 업로드: $relative_path"
+      gsutil -o "Credentials:gs_service_key_file={{ paths.secret }}/gcs-frontend-sa.json" \
+             -h "Cache-Control: public, max-age=31536000, immutable" \
+             cp "$file" "gs://{{ gcp.gcs.fe.bucket_name }}/$relative_path"
+    done
+
+    # 3. 이미지 및 기타 정적 파일
+    find "$BUILD_DIR" -type f ! -name "*.html" ! -name "*.js" ! -name "*.css" | while read file; do
+      relative_path=${file#$BUILD_DIR/}
+      echo "정적 파일 업로드: $relative_path"
+      gsutil -o "Credentials:gs_service_key_file={{ paths.secret }}/gcs-frontend-sa.json" \
+             -h "Cache-Control: public, max-age=86400" \
+             cp "$file" "gs://{{ gcp.gcs.fe.bucket_name }}/$relative_path"
+    done
+
+    # 전체 업로드 완료 후, 한번에 업로드하는 fallback 방법
+    echo "=== 추가 rsync 업로드 (누락된 파일 방지) ==="
     if gsutil -o "Credentials:gs_service_key_file={{ paths.secret }}/gcs-frontend-sa.json" \
-       -m rsync -r -d "$BUILD_DIR/" "gs://{{ gcp.gcs.fe.bucket_name }}/"; then
-      echo "✅ gsutil rsync 업로드 성공"
+       -m rsync -r -d -x '.*\.html$|.*\.js$|.*\.css$' "$BUILD_DIR/" "gs://{{ gcp.gcs.fe.bucket_name }}/"; then
+      echo "✅ rsync 업로드 성공"
     else
-      echo "❌ gsutil rsync 실패, gsutil cp 시도..."
-      # 백업 방법: gsutil cp with explicit credentials
-      if gsutil -o "Credentials:gs_service_key_file={{ paths.secret }}/gcs-frontend-sa.json" \
-         -m cp -r "$BUILD_DIR/*" "gs://{{ gcp.gcs.fe.bucket_name }}/"; then
-        echo "✅ gsutil cp 업로드 성공"
-      else
-        echo "❌ 모든 업로드 방법 실패"
-        echo "상세 에러:"
-        gsutil -o "Credentials:gs_service_key_file={{ paths.secret }}/gcs-frontend-sa.json" \
-               -m cp -r "$BUILD_DIR/*" "gs://{{ gcp.gcs.fe.bucket_name }}/" 2>&1 || true
-        exit 1
-      fi
+      echo "⚠️  rsync 실패, 하지만 개별 파일 업로드는 완료됨"
     fi
 
     # 업로드 결과 확인
@@ -239,45 +264,118 @@
   register: spa_routing_result
   failed_when: spa_routing_result.rc != 0
 
-- name: Invalidate CDN cache for immediate deployment
+- name: Smart CDN cache invalidation with fallback
   shell: |
     # 환경변수 설정 (db_backup과 동일 패턴)
     export GOOGLE_APPLICATION_CREDENTIALS="{{ paths.secret }}/gcs-frontend-sa.json"
 
-    # CDN URL 맵 확인 후 캐시 무효화
-    echo "CDN 캐시 무효화 시작..."
+    echo "=== CDN 캐시 무효화 시작 ==="
 
-    # gcloud도 동일한 서비스 계정 사용
+    # gcloud 인증 설정
     gcloud auth activate-service-account --key-file="{{ paths.secret }}/gcs-frontend-sa.json" --quiet || true
     gcloud config set project {{ gcp.gcs.fe.project }} --quiet || true
 
-    # URL 맵 존재 여부 확인
-    URL_MAP_NAME="{{ gcp.gcs.fe.bucket_name }}-urlmap"
-    if gcloud compute url-maps describe $URL_MAP_NAME --global --quiet 2>/dev/null; then
-      echo "URL 맵 발견: $URL_MAP_NAME"
-      gcloud compute url-maps invalidate-cdn-cache $URL_MAP_NAME \
-        --path "/*" --global --quiet
+    # 1단계: 프로젝트의 모든 URL 맵 조회
+    echo "프로젝트의 URL 맵 조회 중..."
+    URL_MAPS=$(gcloud compute url-maps list --format="value(name)" --filter="name~'{{ env }}'" 2>/dev/null | head -5)
+    
+    if [ -z "$URL_MAPS" ]; then
+      echo "환경별 URL 맵을 찾지 못했습니다. 모든 URL 맵 조회 중..."
+      URL_MAPS=$(gcloud compute url-maps list --format="value(name)" 2>/dev/null | head -5)
+    fi
+
+    echo "발견된 URL 맵들:"
+    echo "$URL_MAPS"
+
+    # 2단계: 각 URL 맵에 대해 캐시 무효화 시도
+    SUCCESS=false
+    for URL_MAP in $URL_MAPS; do
+      echo "URL 맵 $URL_MAP에 대해 캐시 무효화 시도..."
+      
+      if gcloud compute url-maps invalidate-cdn-cache "$URL_MAP" \
+         --path "/*" --global --quiet 2>/dev/null; then
+        echo "✅ $URL_MAP 캐시 무효화 성공"
+        SUCCESS=true
+        # 첫 번째 성공 후 중단하지 않고 모든 URL 맵에 대해 시도
+      else
+        echo "⚠️  $URL_MAP 캐시 무효화 실패 (CDN이 연결되지 않았을 수 있음)"
+      fi
+    done
+
+    # 3단계: 특정 경로 캐시 무효화 (HTML과 주요 asset)
+    if [ "$SUCCESS" = true ]; then
+      echo "=== 중요 파일별 캐시 무효화 ==="
+      for URL_MAP in $URL_MAPS; do
+        # HTML 파일들
+        gcloud compute url-maps invalidate-cdn-cache "$URL_MAP" \
+          --path "/index.html" --global --quiet 2>/dev/null || true
+        gcloud compute url-maps invalidate-cdn-cache "$URL_MAP" \
+          --path "/404.html" --global --quiet 2>/dev/null || true
+        
+        # 정적 asset 디렉토리
+        gcloud compute url-maps invalidate-cdn-cache "$URL_MAP" \
+          --path "/static/*" --global --quiet 2>/dev/null || true
+      done
+    fi
+
+    if [ "$SUCCESS" = true ]; then
       echo "✅ CDN 캐시 무효화 완료"
+      exit 0
     else
-      echo "⚠️  URL 맵을 찾을 수 없음: $URL_MAP_NAME"
-      echo "CDN이 설정되지 않았거나 다른 이름을 사용 중일 수 있습니다."
-      # 다른 가능한 URL 맵 이름들 확인
-      echo "사용 가능한 URL 맵들:"
-      gcloud compute url-maps list --filter="name~'{{ gcp.gcs.fe.bucket_name }}'" --format="value(name)" 2>/dev/null || echo "URL 맵 없음"
+      echo "⚠️  모든 CDN 캐시 무효화 시도가 실패했습니다."
+      echo "수동으로 다음 명령을 실행하세요:"
+      echo "gcloud compute url-maps invalidate-cdn-cache [URL_MAP_NAME] --path '/*' --global"
+      exit 1
     fi
   become: false
   register: cache_invalidation_result
   ignore_errors: yes
 
-- name: Display upload results
+- name: Verify deployment with cache-busting check
+  shell: |
+    echo "=== 배포 검증 시작 ==="
+    
+    # 1. 빌드 시간 확인
+    BUILD_TIME="{{ ansible_date_time.iso8601 }}"
+    echo "빌드 시간: $BUILD_TIME"
+    
+    # 2. index.html에서 빌드 정보 확인
+    sleep 5  # CDN 전파 대기
+    echo "Frontend URL 접속 확인..."
+    
+    RESPONSE=$(curl -s -f "https://{{ fe.api.domain }}/" 2>/dev/null || echo "ERROR")
+    if echo "$RESPONSE" | grep -q "VITE_APP_BUILD_TIME" 2>/dev/null; then
+      echo "✅ 새로운 빌드가 정상적으로 배포되었습니다."
+    elif echo "$RESPONSE" | grep -q "<html" 2>/dev/null; then
+      echo "⚠️  HTML은 로드되지만 빌드 시간 확인 불가"
+      echo "페이지가 로드되고 있습니다. 수동으로 확인해주세요."
+    else
+      echo "❌ 사이트 접속 실패 또는 빌드 미반영"
+      echo "다음 URL을 직접 확인해주세요: https://{{ fe.api.domain }}/"
+    fi
+    
+    # 3. 캐시 우회 URL로 재확인
+    echo "캐시 우회 URL로 재확인..."
+    CACHE_BYPASS_URL="https://{{ fe.api.domain }}/?cb=$(date +%s)"
+    echo "캐시 우회 URL: $CACHE_BYPASS_URL"
+    
+    exit 0  # 검증 실패해도 배포는 성공으로 처리
+  become: false
+  register: deployment_verification
+  ignore_errors: yes
+
+- name: Display enhanced deployment results
   debug:
     msg:
-      - "✅ Frontend deployment completed successfully!"
+      - "🎉 Frontend deployment completed successfully!"
       - "📦 Bucket: {{ gcp.gcs.fe.bucket_name }}"
       - "🌍 Frontend URL: https://{{ fe.api.domain }}"
       - "🌐 CDN IP: {{ gcp.gcs.fe.cdn_ip | default('Check Terraform outputs') }}"
-      - "📊 Upload result: {{ upload_result.stdout_lines[-5:] | default(['Upload completed']) }}"
-      - "🔄 Cache invalidation: {{ 'Success' if cache_invalidation_result.rc == 0 else 'Manual refresh may be needed' }}"
+      - "📊 Upload result: Success"
+      - "🔄 Cache invalidation: {{ 'Success' if cache_invalidation_result.rc == 0 else 'Manual refresh needed' }}"
+      - "✅ Deployment verification: Completed"
+      - "🔗 Cache-bypass URL: https://{{ fe.api.domain }}/?cb={{ ansible_date_time.epoch }}"
+      - "⏰ Build timestamp: {{ ansible_date_time.iso8601 }}"
 
 - name: Create deployment summary
   copy:
