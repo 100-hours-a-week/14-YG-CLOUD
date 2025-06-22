@@ -43,11 +43,39 @@ Internet
 
 ## 🚀 빠른 시작
 
+### 🆕 신규 사용자라면?
+**처음 이 프로젝트를 사용하시나요?** 다음 문서들을 순서대로 확인하세요:
+
+1. **📋 [신규 사용자 체크리스트](CHECKLIST-NEW-USER.md)** - 필수 준비사항 단계별 체크
+2. **🔧 [환경 설정 스크립트](scripts/setup-new-user.sh)** - 자동 환경 설정 및 연결 테스트
+3. **❓ [자주 묻는 질문](FAQ-NEW-USER.md)** - 설정 및 배포 관련 FAQ
+4. **📚 [완전 재배포 가이드](COMPLETE-REDEPLOY-GUIDE.md)** - 전체 배포 프로세스
+
 ### 📋 사전 요구사항
-- GCP 프로젝트 및 권한
-- Terraform >= 1.0
-- Ansible >= 2.9
+- GCP 프로젝트 및 서비스 계정 키
+- Terraform >= 1.5
+- Ansible >= 2.12
 - WireGuard VPN 클라이언트
+- SSH 키 (GCP 등록 필요)
+- Ansible Vault 패스워드
+
+### ⚡ 즉시 시작 (경험자용)
+```bash
+# 1. Repository clone
+git clone [repository-url]
+cd 14-YG-CLOUD
+
+# 2. 환경 설정 체크 (신규 사용자)
+./scripts/setup-new-user.sh
+
+# 3. 인프라 배포
+cd terraform/environments/test
+terraform init && terraform apply
+
+# 4. 서비스 배포
+cd ../../../ansible
+ansible-playbook -i test.ini playbooks/main.yml
+```
 
 ### ⚡ 5분 배포
 ```bash
@@ -55,17 +83,43 @@ Internet
 git clone <repository-url>
 cd 14-YG-CLOUD
 
-# 2. Bootstrap 리소스 생성
-cd terraform/bootstrap
-terraform init && terraform apply
+### 📖 자세한 배포 가이드
 
-# 3. Test 환경 배포
-cd ../environments/test
-terraform init && terraform apply
+#### 1️⃣ 처음 배포 (신규 사용자)
+```bash
+# 환경 설정 확인 (필수!)
+./scripts/setup-new-user.sh
 
-# 4. 애플리케이션 배포
-cd ../../ansible
-ansible-playbook -i inventories/test.ini main.yml -e "env=test"
+# 인프라 생성
+cd terraform/environments/test
+terraform init
+terraform plan  # 리소스 확인
+terraform apply
+
+# 서비스 배포
+cd ../../../ansible
+ansible-playbook -i test.ini playbooks/main.yml
+```
+
+#### 2️⃣ 재배포 (기존 사용자)
+```bash
+# 완전 재배포
+cd terraform/environments/test
+terraform destroy  # 기존 인프라 삭제
+terraform apply     # 새로 생성
+
+cd ../../../ansible
+ansible-playbook -i test.ini playbooks/main.yml
+```
+
+#### 3️⃣ 부분 배포 (코드 변경)
+```bash
+# 백엔드만 재배포
+ansible-playbook -i test.ini playbooks/main.yml --tags be_deploy
+
+# 프론트엔드만 재배포  
+ansible-playbook -i test.ini playbooks/main.yml --tags fe_deploy
+```
 ```
 
 ### 🔍 상태 확인

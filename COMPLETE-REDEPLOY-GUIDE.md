@@ -2,6 +2,220 @@
 
 이 가이드는 Terraform 완전 삭제 후 전체 3-tier 구조를 처음부터 재구성하는 절차입니다.
 
+## 🆕 신규 사용자 필수 준비사항
+
+> ⚠️ **중요**: 이 repository를 clone한 후 반드시 아래 항목들을 별도로 준비해야 합니다!
+
+### 1. 🔐 SSH 키 설정 (필수)
+```bash
+# 1. SSH 키 생성 (없는 경우)
+ssh-keygen -t rsa -b 4096 -C "your-email@example.com" -f ~/.ssh/lsh-study-key
+
+# 2. SSH 키 권한 설정
+chmod 600 ~/.ssh/lsh-study-key
+chmod 644 ~/.ssh/lsh-study-key.pub
+
+# 3. SSH 키를 GCP 프로젝트에 등록
+# - GCP Console > Compute Engine > Metadata > SSH Keys
+# - ~/.ssh/lsh-study-key.pub 내용을 복사하여 추가
+# - Username: lsh (jumpbox용), ubuntu (VM용)
+```
+
+### 2. 🔑 Ansible Vault 패스워드 설정 (필수)
+```bash
+# Ansible vault 패스워드 파일 생성
+echo "your-vault-password-here" > ~/.ansible_vault_pass
+chmod 600 ~/.ansible_vault_pass
+
+# 환경변수 설정 (선택사항, 매번 --ask-vault-pass 생략 가능)
+echo 'export ANSIBLE_VAULT_PASSWORD_FILE=~/.ansible_vault_pass' >> ~/.zshrc
+source ~/.zshrc
+```
+
+### 3. 🌐 WireGuard VPN 설정 (내부 네트워크 접근용)
+```bash
+# 1. WireGuard 설치 (macOS)
+brew install wireguard-tools
+
+# 2. 개인 클라이언트 설정 파일 요청
+# - 관리자에게 개인별 .conf 파일 요청
+# - 예: john-client.conf, jane-client.conf
+
+# 3. WireGuard 연결
+sudo wg-quick up /path/to/your-client.conf
+
+# 4. 연결 확인
+ping 10.0.0.2  # database 서버 접근 테스트
+```
+
+### 4. 🔧 로컬 환경 설정
+```bash
+# 1. 필수 도구 설치
+brew install terraform ansible jq curl
+
+# 2. Terraform 버전 확인 (1.5+ 권장)
+terraform --version
+
+# 3. Ansible 버전 확인 (2.12+ 권장)
+ansible --version
+
+# 4. SSH Agent 설정
+ssh-add ~/.ssh/lsh-study-key
+ssh-add -l  # 키 등록 확인
+```
+
+### 5. 🔐 GCP 서비스 계정 키 (Terraform 실행용)
+```bash
+# 1. GCP 서비스 계정 키 JSON 파일 획득
+# - 관리자에게 서비스 계정 키 파일 요청
+# - 또는 GCP Console에서 직접 생성
+
+# 2. 키 파일 저장 및 권한 설정
+mv service-account-key.json ~/.gcp/terraform-key.json
+chmod 600 ~/.gcp/terraform-key.json
+
+# 3. 환경변수 설정
+echo 'export GOOGLE_APPLICATION_CREDENTIALS=~/.gcp/terraform-key.json' >> ~/.zshrc
+source ~/.zshrc
+```
+
+### 6. 📁 Repository 설정
+```bash
+# 1. Repository clone
+git clone https://github.com/your-org/3tier-moongsan.git
+cd 3tier-moongsan/14-YG-CLOUD
+
+# 2. .gitignore 확인 (민감한 파일들이 제외되어 있는지)
+cat .gitignore
+# 다음 항목들이 포함되어야 함:
+# *.tfstate
+# *.tfstate.backup
+# .terraform/
+# *.pem
+# *.key
+# *vault_pass*
+# service-account-key.json
+
+# 3. 환경별 설정 파일 복사 (템플릿에서)
+cp ansible/group_vars/test/all.yml.template ansible/group_vars/test/all.yml
+# 개인 환경에 맞게 수정
+```
+
+### 7. 🎯 초기 설정 스크립트
+```bash
+#!/bin/bash
+# setup-new-user.sh - 신규 사용자 환경 설정
+
+echo "🚀 신규 사용자 환경 설정을 시작합니다..."
+
+# SSH 키 확인
+if [ ! -f ~/.ssh/lsh-study-key ]; then
+    echo "❌ SSH 키가 없습니다. ~/.ssh/lsh-study-key를 생성하거나 복사하세요."
+    exit 1
+fi
+
+# WireGuard 연결 확인
+if ! ping -c 1 10.0.0.2 >/dev/null 2>&1; then
+    echo "❌ WireGuard VPN이 연결되지 않았습니다."
+    echo "   sudo wg-quick up your-client.conf 를 실행하세요."
+    exit 1
+fi
+
+# Ansible vault 패스워드 확인
+if [ ! -f ~/.ansible_vault_pass ]; then
+    echo "❌ Ansible vault 패스워드 파일이 없습니다."
+    echo "   echo 'password' > ~/.ansible_vault_pass 를 실행하세요."
+    exit 1
+fi
+
+# GCP 인증 확인
+if [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+    echo "❌ GCP 서비스 계정 키가 설정되지 않았습니다."
+    exit 1
+fi
+
+# Ansible 연결 테스트
+echo "🔍 Ansible 연결 테스트..."
+cd ansible
+if ansible -i test.ini all -m ping; then
+    echo "✅ 모든 준비가 완료되었습니다!"
+    echo "🎉 이제 배포를 시작할 수 있습니다."
+else
+    echo "❌ Ansible 연결에 실패했습니다. 설정을 다시 확인하세요."
+    exit 1
+fi
+```
+
+### 8. 🔒 보안 주의사항
+
+#### 절대 Git에 커밋하면 안 되는 파일들:
+- `~/.ssh/lsh-study-key` (개인 SSH 키)
+- `~/.ansible_vault_pass` (Vault 패스워드)
+- `*.conf` (WireGuard 클라이언트 설정)
+- `service-account-key.json` (GCP 서비스 계정 키)
+- `terraform.tfstate*` (Terraform 상태 파일)
+- `.terraform/` (Terraform 캐시)
+
+#### 권한 설정:
+```bash
+# SSH 키
+chmod 600 ~/.ssh/lsh-study-key
+chmod 644 ~/.ssh/lsh-study-key.pub
+
+# Ansible vault
+chmod 600 ~/.ansible_vault_pass
+
+# GCP 키
+chmod 600 ~/.gcp/terraform-key.json
+
+# WireGuard 설정
+chmod 600 ~/wireguard/*.conf
+```
+
+### 9. 🚀 첫 실행 체크리스트
+
+신규 사용자는 다음 순서로 확인하세요:
+
+#### ✅ 사전 준비 완료 확인
+- [ ] SSH 키 생성 및 GCP 등록 완료
+- [ ] Ansible Vault 패스워드 설정 완료
+- [ ] WireGuard VPN 연결 및 내부 네트워크 접근 가능
+- [ ] GCP 서비스 계정 키 설정 완료
+- [ ] 필수 도구 설치 완료 (terraform, ansible, wg)
+
+#### ✅ 연결 테스트
+```bash
+# 1. SSH 연결 테스트
+ssh -i ~/.ssh/lsh-study-key lsh@34.22.110.81 "echo 'Jumpbox OK'"
+
+# 2. WireGuard 테스트
+ping -c 3 10.0.0.2
+
+# 3. Ansible 연결 테스트
+cd ansible
+ansible -i test.ini all -m ping
+
+# 4. Terraform 인증 테스트
+cd terraform/environments/test
+terraform init
+```
+
+#### ✅ 첫 배포 실행
+```bash
+# 위의 모든 테스트가 성공하면 배포 시작
+ansible-playbook -i test.ini playbooks/main.yml
+```
+
+### 10. 📞 문제 해결 연락처
+
+설정 중 문제가 발생하면:
+1. **SSH 키 문제**: 관리자에게 GCP SSH 키 등록 요청
+2. **WireGuard 문제**: 관리자에게 개인 클라이언트 설정 파일 요청
+3. **Vault 패스워드**: 관리자에게 현재 vault 패스워드 확인
+4. **GCP 권한**: 관리자에게 서비스 계정 키 및 프로젝트 권한 요청
+
+---
+
 ## 📋 사전 준비
 
 ### 1. 환경 확인
@@ -518,3 +732,238 @@ test 환경에서 모든 체크리스트가 통과되면 prod 환경으로 마�
 - 🌍 **CDN**: 프론트엔드 GCS + CDN 자동 배포
 
 **한 번의 명령어로 전체 3-tier 스택을 완전히 재구성**할 수 있는 완전 자동화 환경이 완성되었습니다! 🎉
+
+---
+
+# 🔐 신규 사용자를 위한 필수 준비물 가이드
+
+이 프로젝트를 새로 clone하여 사용하려면 다음 파일들과 설정이 **별도로 필요**합니다.
+
+## 🔴 필수 준비물 체크리스트
+
+### 1. 🗝️ SSH 키 (필수)
+```bash
+# ~/.ssh/lsh-study-key (개인 키)
+# ~/.ssh/lsh-study-key.pub (공개 키)
+
+# 키 생성 방법:
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/lsh-study-key -C "your-email@domain.com"
+chmod 600 ~/.ssh/lsh-study-key
+chmod 644 ~/.ssh/lsh-study-key.pub
+
+# 키 등록 필요한 곳:
+# - GCP Compute Engine > 메타데이터 > SSH 키
+# - 각 VM 인스턴스 (terraform으로 자동 등록됨)
+```
+
+### 2. 🛡️ Ansible Vault 패스워드 (필수)
+```bash
+# 파일 위치: ~/.ansible-vault-pass
+# 또는 원하는 위치에 생성 후 환경변수 설정
+
+# 패스워드 파일 생성:
+echo "your-secure-vault-password" > ~/.ansible-vault-pass
+chmod 600 ~/.ansible-vault-pass
+
+# 환경변수 설정 (선택사항):
+export ANSIBLE_VAULT_PASSWORD_FILE=~/.ansible-vault-pass
+```
+
+### 3. 🔐 WireGuard VPN 설정 (필수)
+```bash
+# 클라이언트 설정 파일 필요:
+# - admin-client.conf (또는 개인별 설정 파일)
+# - wg0.conf (서버 설정 - 서버 관리자만 필요)
+
+# 클라이언트 설정 파일 위치:
+# /etc/wireguard/wg0.conf (Linux)
+# 또는 WireGuard 앱에서 import
+
+# 설정 파일 예시:
+[Interface]
+PrivateKey = YOUR_PRIVATE_KEY
+Address = 10.0.0.x/24
+DNS = 8.8.8.8
+
+[Peer]
+PublicKey = SERVER_PUBLIC_KEY
+Endpoint = SERVER_IP:51820
+AllowedIPs = 10.0.0.0/8, 192.168.0.0/16
+PersistentKeepalive = 25
+```
+
+### 4. 🌐 GCP 서비스 계정 키 (필수)
+```bash
+# GCP 콘솔에서 서비스 계정 키 생성:
+# IAM > 서비스 계정 > 키 생성 > JSON 다운로드
+
+# 키 파일 위치:
+# ~/.gcp/service-account-key.json
+
+# 환경변수 설정:
+export GOOGLE_APPLICATION_CREDENTIALS=~/.gcp/service-account-key.json
+
+# 필요한 권한:
+# - Compute Engine Admin
+# - Storage Admin  
+# - DNS Admin
+# - VPC Access Admin
+```
+
+### 5. 📦 Ansible 암호화된 변수들 (선택사항)
+```bash
+# 현재 암호화된 변수 파일들:
+# ansible/group_vars/*/vault.yml (있다면)
+
+# 복호화 확인:
+ansible-vault view ansible/group_vars/test/vault.yml
+
+# 새로운 암호화된 변수 생성:
+ansible-vault create ansible/group_vars/prod/vault.yml
+```
+
+## 🔧 설정 가이드
+
+### 1. 초기 설정 스크립트
+```bash
+#!/bin/bash
+# setup-environment.sh
+
+echo "🚀 Moongsan 3-Tier 환경 설정 시작..."
+
+# 1. SSH 키 확인
+if [ ! -f ~/.ssh/lsh-study-key ]; then
+    echo "❌ SSH 키가 없습니다. 생성해주세요:"
+    echo "ssh-keygen -t rsa -b 4096 -f ~/.ssh/lsh-study-key"
+    exit 1
+fi
+
+# 2. Ansible Vault 패스워드 확인
+if [ ! -f ~/.ansible-vault-pass ]; then
+    echo "❌ Ansible Vault 패스워드 파일이 없습니다."
+    echo "echo 'your-password' > ~/.ansible-vault-pass && chmod 600 ~/.ansible-vault-pass"
+    exit 1
+fi
+
+# 3. GCP 서비스 계정 키 확인
+if [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+    echo "❌ GCP 서비스 계정 키가 설정되지 않았습니다."
+    echo "export GOOGLE_APPLICATION_CREDENTIALS=~/.gcp/service-account-key.json"
+    exit 1
+fi
+
+# 4. WireGuard 연결 확인
+if ! ping -c 1 10.0.0.1 >/dev/null 2>&1; then
+    echo "❌ WireGuard VPN이 연결되지 않았습니다."
+    echo "WireGuard 클라이언트를 실행하고 VPN에 연결해주세요."
+    exit 1
+fi
+
+echo "✅ 모든 필수 설정이 완료되었습니다!"
+echo "🎯 이제 배포를 시작할 수 있습니다:"
+echo "   cd ansible && ansible-playbook -i test.ini playbooks/main.yml"
+```
+
+### 2. 환경변수 설정 (.bashrc 또는 .zshrc)
+```bash
+# Moongsan 3-Tier 프로젝트 환경변수
+export ANSIBLE_VAULT_PASSWORD_FILE=~/.ansible-vault-pass
+export GOOGLE_APPLICATION_CREDENTIALS=~/.gcp/service-account-key.json
+export ANSIBLE_HOST_KEY_CHECKING=False
+
+# SSH 키 자동 로드
+ssh-add ~/.ssh/lsh-study-key 2>/dev/null
+
+# 프로젝트 디렉토리 단축명령
+alias cdmoon='cd ~/Documents/local/3tier-moongsan/14-YG-CLOUD'
+alias ansible-moon='cd ~/Documents/local/3tier-moongsan/14-YG-CLOUD/ansible'
+```
+
+## 🚨 보안 주의사항
+
+### 1. 절대 Git에 포함하면 안 되는 파일들
+```bash
+# .gitignore에 반드시 포함:
+*.key
+*.pem
+*-key.json
+vault.yml
+.env
+.env.*
+**/secrets/**
+```
+
+### 2. 민감한 정보 관리
+```bash
+# 1. SSH 키는 개인 키 매니저 사용
+# 2. Ansible Vault 패스워드는 별도 저장소
+# 3. GCP 서비스 계정 키는 정기적 순환
+# 4. WireGuard 설정은 개인별 분리
+```
+
+### 3. 팀 공유 방법
+```bash
+# 1. 비밀번호: 별도 보안 채널 (1Password, Bitwarden 등)
+# 2. SSH 키: 개인별 생성, 공개키만 공유
+# 3. VPN 설정: 개인별 클라이언트 설정 파일 생성
+# 4. GCP 키: 개인별 서비스 계정 생성 권장
+```
+
+## 📋 신규 사용자 체크리스트
+
+### 배포 전 준비사항
+- [ ] 프로젝트 clone 완료
+- [ ] SSH 키 생성 및 GCP 등록
+- [ ] Ansible Vault 패스워드 설정
+- [ ] GCP 서비스 계정 키 다운로드 및 설정
+- [ ] WireGuard VPN 연결 설정
+- [ ] 환경변수 설정 (.bashrc/.zshrc)
+- [ ] 초기 설정 스크립트 실행
+
+### 첫 배포 테스트
+```bash
+# 1. 환경 확인
+cd ansible
+ansible --version
+ansible-vault --help
+
+# 2. 연결 테스트  
+ansible -i test.ini all -m ping
+
+# 3. 테스트 배포
+ansible-playbook -i test.ini playbooks/main.yml --tags "base" --check
+
+# 4. 실제 배포
+ansible-playbook -i test.ini playbooks/main.yml
+```
+
+## 🎯 트러블슈팅 FAQ
+
+### Q: "Vault password required" 오류가 발생합니다
+```bash
+# A: Vault 패스워드 파일 경로 확인
+export ANSIBLE_VAULT_PASSWORD_FILE=~/.ansible-vault-pass
+# 또는
+ansible-playbook -i test.ini playbooks/main.yml --ask-vault-pass
+```
+
+### Q: SSH 연결이 안 됩니다
+```bash
+# A: 키 권한 및 VPN 연결 확인
+chmod 600 ~/.ssh/lsh-study-key
+ssh-add ~/.ssh/lsh-study-key
+# WireGuard VPN 연결 상태 확인
+```
+
+### Q: GCP 권한 오류가 발생합니다
+```bash
+# A: 서비스 계정 키 및 권한 확인
+gcloud auth list
+gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+```
+
+---
+
+이제 **완전한 3-tier 자동화 배포 환경**을 누구나 재현할 수 있습니다! 🚀
+
+위의 준비물들만 갖추면 `ansible-playbook` 한 번으로 전체 인프라를 배포할 수 있습니다.
