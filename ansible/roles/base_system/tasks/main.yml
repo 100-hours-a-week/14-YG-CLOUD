@@ -4,7 +4,7 @@
   command: docker --version
   register: docker_check
   ignore_errors: yes
-  when: "'backend' in group_names or 'ai' in group_names"
+  when: "'backend' in group_names or 'ai' in group_names or 'database' in group_names"
 
 - name: Update system packages
   apt:
@@ -93,31 +93,31 @@
     - {name: "net.ipv4.tcp_rmem", value: "4096 65536 134217728"}
     - {name: "net.ipv4.tcp_wmem", value: "4096 65536 134217728"}
 
-- name: Install Docker for backend and AI servers
+- name: Install Docker for backend, AI and database servers
   apt:
     name: docker.io
     state: present
   become: yes
   when:
-    - "'backend' in group_names or 'ai' in group_names"
+    - "'backend' in group_names or 'ai' in group_names or 'database' in group_names"
     - docker_check is defined
     - docker_check.rc != 0
 
-- name: Start and enable Docker for backend and AI servers
+- name: Start and enable Docker for backend, AI and database servers
   systemd:
     name: docker
     state: started
     enabled: yes
   become: yes
-  when: "'backend' in group_names or 'ai' in group_names"
+  when: "'backend' in group_names or 'ai' in group_names or 'database' in group_names"
 
-- name: Add ubuntu user to docker group for backend and AI servers
+- name: Add ubuntu user to docker group for backend, AI and database servers
   user:
     name: "{{ system.user }}"
     groups: docker
     append: yes
   become: yes
-  when: "'backend' in group_names or 'ai' in group_names"
+  when: "'backend' in group_names or 'ai' in group_names or 'database' in group_names"
 
 - name: Install Docker Compose for backend server only
   pip:

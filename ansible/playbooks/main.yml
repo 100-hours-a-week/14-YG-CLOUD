@@ -76,6 +76,11 @@
     - database
     - data
   tasks:
+    - name: Docker 네트워크 설정
+      include_role:
+        name: docker_net
+      when: "'database' in group_names"
+
     - name: MySQL 데이터베이스 설정
       include_role:
         name: database
