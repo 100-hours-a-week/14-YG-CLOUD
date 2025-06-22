@@ -1,0 +1,59 @@
+---
+# 🔧 DB Fix 역할 전용 플레이북
+#
+# 기존 db_fix 역할을 간단하게 실행하는 플레이북
+#
+# 사용법:
+#   ansible-playbook -i prod.ini playbooks/simple_db_fix.yml
+
+- name: "🔧 DB Fix 작업 시작"
+  hosts: localhost
+  connection: local
+  gather_facts: yes
+  vars:
+    deployment_env: "{{ groups.keys() | select('match', '^(dev|test|prod)$') | list | first | default('unknown') }}"
+  tasks:
+    - name: 작업 정보 표시
+      debug:
+        msg:
+          - "🎯 대상 환경: {{ deployment_env | upper }}"
+          - "📅 작업 시간: {{ ansible_date_time.iso8601 }}"
+          - "🔧 작업: DB Fix 역할 실행"
+
+    - name: 환경 검증
+      assert:
+        that:
+          - deployment_env != 'unknown'
+          - deployment_env in ['dev', 'test', 'prod']
+        fail_msg: "❌ 올바른 환경이 감지되지 않았습니다."
+        success_msg: "✅ 환경 검증 완료: {{ deployment_env }}"
+
+# DB Fix 역할 실행
+- name: "🗄️ DB Fix 역할 실행"
+  hosts: database
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: DB Fix 역할 실행
+      include_role:
+        name: db_fix
+      when: "'database' in group_names"
+
+# 작업 완료
+- name: "✅ DB Fix 작업 완료"
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars:
+    deployment_env: "{{ groups.keys() | select('match', '^(dev|test|prod)$') | list | first | default('unknown') }}"
+  tasks:
+    - name: 작업 완료 알림
+      debug:
+        msg:
+          - "🎉 DB Fix 작업이 완료되었습니다!"
+          - "🎯 환경: {{ deployment_env | upper }}"
+          - "⏰ 완료 시간: {{ ansible_date_time.iso8601 }}"
+          - ""
+          - "🔍 확인 명령어:"
+          - "  ansible -i {{ deployment_env }}.ini database -m shell -a 'docker exec mysql-moongsan mysql -u root -ppass -e \"SHOW DATABASES;\"'"
+          - "  ansible -i {{ deployment_env }}.ini database -m shell -a 'docker exec mysql-moongsan mysql -u root -ppass moongsan_{{ deployment_env }}_db -e \"SHOW TABLES;\"'"

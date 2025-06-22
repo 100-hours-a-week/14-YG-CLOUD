@@ -58,6 +58,9 @@ resource "google_compute_subnetwork" "prod_subnet" {
   region        = var.region
   network       = google_compute_network.prod_vpc.id
   description   = "Production subnet for moongsan project"
+  
+  # Private Google Access 활성화 (GCP 서비스 접근용)
+  private_ip_google_access = true
 }
 
 # 방화벽 규칙 - 내부 통신 허용
@@ -124,6 +127,40 @@ resource "google_compute_firewall" "prod_health_check" {
   ]
 
   target_tags = ["prod-internal"]  # 백엔드 서버는 prod-internal 태그를 가지고 있음
+}
+
+# ========================================
+# NAT Gateway (prod 전용 인터넷 접근)
+# ========================================
+
+# Cloud Router
+resource "google_compute_router" "prod_router" {
+  name    = "prod-router"
+  region  = var.region
+  network = google_compute_network.prod_vpc.id
+}
+
+# NAT Gateway
+resource "google_compute_router_nat" "prod_nat" {
+  name                               = "prod-nat"
+  router                             = google_compute_router.prod_router.name
+  region                             = var.region
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+
+  log_config {
+    enable = true
+    filter = "ERRORS_ONLY"
+  }
+}
+
+# 기본 인터넷 라우트 (0.0.0.0/0)
+resource "google_compute_route" "prod_default_route" {
+  name             = "prod-default-route"
+  dest_range       = "0.0.0.0/0"
+  network          = google_compute_network.prod_vpc.name
+  next_hop_gateway = "default-internet-gateway"
+  priority         = 1000
 }
 
 # ========================================

@@ -1,0 +1,381 @@
+---
+# 🗄️ 데이터베이스 관리 전용 플레이북
+#
+# 사용법:
+#   ansible-playbook -i prod.ini playbooks/db_management.yml --tags backup
+#   ansible-playbook -i prod.ini playbooks/db_management.yml --tags reset
+#   ansible-playbook -i prod.ini playbooks/db_management.yml --tags restore -e dump_file=/path/to/dump.sql
+#   ansible-playbook -i prod.ini playbooks/db_management.yml --tags import -e dump_file=/path/to/dump.sql
+#   ansible-playbook -i prod.ini playbooks/db_management.yml --tags clean
+#
+# 지원하는 작업:
+#   --tags "backup"     # 전체 데이터베이스 백업
+#   --tags "reset"      # 데이터베이스 완전 초기화 (위험!)
+#   --tags "restore"    # 백업에서 전체 복원
+#   --tags "import"     # 특정 덤프 파일 임포트
+#   --tags "clean"      # 특정 데이터베이스만 초기화
+#   --tags "status"     # 데이터베이스 상태 확인
+
+- name: "🗄️ 데이터베이스 관리 작업 시작"
+  hosts: localhost
+  connection: local
+  gather_facts: yes
+  vars:
+    deployment_env: "{{ groups.keys() | select('match', '^(dev|test|prod)$') | list | first | default('unknown') }}"
+  tasks:
+    - name: 환경 및 작업 정보 표시
+      debug:
+        msg:
+          - "🎯 대상 환경: {{ deployment_env | upper }}"
+          - "📅 작업 시간: {{ ansible_date_time.iso8601 }}"
+          - "👤 실행 사용자: {{ ansible_user_id }}"
+          - "⚠️  주의: 데이터베이스 작업은 신중하게 수행하세요!"
+
+    - name: 환경 검증
+      assert:
+        that:
+          - deployment_env != 'unknown'
+          - deployment_env in ['dev', 'test', 'prod']
+        fail_msg: "❌ 올바른 환경이 감지되지 않았습니다."
+        success_msg: "✅ 환경 검증 완료: {{ deployment_env }}"
+
+# 데이터베이스 상태 확인
+- name: "📊 데이터베이스 상태 확인"
+  hosts: database
+  become: yes
+  gather_facts: yes
+  tags:
+    - status
+    - always
+  tasks:
+    - name: MySQL 컨테이너 상태 확인
+      shell: docker ps --filter "name=mysql-{{ service_name }}" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+      register: mysql_status
+      when: "'database' in group_names"
+
+    - name: MySQL 상태 표시
+      debug:
+        msg: "{{ mysql_status.stdout_lines }}"
+      when: "'database' in group_names"
+
+    - name: 데이터베이스 목록 확인
+      shell: |
+        docker exec mysql-{{ service_name }} mysql \
+          -u root -p{{ db.mysql.root_password }} \
+          -e "SHOW DATABASES;"
+      register: databases_list
+      when: "'database' in group_names"
+
+    - name: 데이터베이스 목록 표시
+      debug:
+        msg: "{{ databases_list.stdout_lines }}"
+      when: "'database' in group_names"
+
+# 백업 생성
+- name: "💾 데이터베이스 백업 생성"
+  hosts: database
+  become: yes
+  gather_facts: yes
+  tags:
+    - backup
+  tasks:
+    - name: 백업 디렉토리 생성
+      file:
+        path: "{{ paths.backup }}/db_{{ ansible_date_time.epoch }}"
+        state: directory
+        mode: "0755"
+        owner: "{{ system.user }}"
+        group: "{{ system.user }}"
+      when: "'database' in group_names"
+
+    - name: 전체 데이터베이스 백업
+      shell: |
+        docker exec mysql-{{ service_name }} mysqldump \
+          -u root -p{{ db.mysql.root_password }} \
+          --all-databases \
+          --single-transaction \
+          --routines \
+          --triggers \
+          --events \
+          --flush-logs \
+          --master-data=2 > {{ paths.backup }}/db_{{ ansible_date_time.epoch }}/full_backup_{{ ansible_date_time.epoch }}.sql
+      register: backup_result
+      when: "'database' in group_names"
+
+    - name: 애플리케이션 데이터베이스만 백업
+      shell: |
+        docker exec mysql-{{ service_name }} mysqldump \
+          -u root -p{{ db.mysql.root_password }} \
+          --single-transaction \
+          --routines \
+          --triggers \
+          {{ db.mysql.name }} > {{ paths.backup }}/db_{{ ansible_date_time.epoch }}/app_backup_{{ ansible_date_time.epoch }}.sql
+      register: app_backup_result
+      when: "'database' in group_names"
+
+    - name: 백업 파일 권한 설정
+      file:
+        path: "{{ item }}"
+        owner: "{{ system.user }}"
+        group: "{{ system.user }}"
+        mode: "0644"
+      loop:
+        - "{{ paths.backup }}/db_{{ ansible_date_time.epoch }}/full_backup_{{ ansible_date_time.epoch }}.sql"
+        - "{{ paths.backup }}/db_{{ ansible_date_time.epoch }}/app_backup_{{ ansible_date_time.epoch }}.sql"
+      when: "'database' in group_names"
+
+    - name: 백업 상태 확인
+      debug:
+        msg:
+          - "✅ 백업 완료!"
+          - "📁 전체 백업: {{ paths.backup }}/db_{{ ansible_date_time.epoch }}/full_backup_{{ ansible_date_time.epoch }}.sql"
+          - "📁 앱 백업: {{ paths.backup }}/db_{{ ansible_date_time.epoch }}/app_backup_{{ ansible_date_time.epoch }}.sql"
+      when: backup_result is succeeded and app_backup_result is succeeded
+
+# 특정 데이터베이스 초기화 (안전한 방법)
+- name: "🧹 애플리케이션 데이터베이스 정리"
+  hosts: database
+  become: yes
+  gather_facts: yes
+  tags:
+    - clean
+  tasks:
+    - name: 안전 확인
+      pause:
+        prompt: "⚠️  애플리케이션 데이터베이스({{ db.mysql.name }})를 초기화하시겠습니까? (yes/no)"
+      register: clean_confirmation
+
+    - name: 작업 취소
+      fail:
+        msg: "❌ 데이터베이스 정리가 취소되었습니다."
+      when: clean_confirmation.user_input != 'yes'
+
+    - name: 애플리케이션 데이터베이스 드롭
+      shell: |
+        docker exec mysql-{{ service_name }} mysql \
+          -u root -p{{ db.mysql.root_password }} \
+          -e "DROP DATABASE IF EXISTS {{ db.mysql.name }};"
+      when: "'database' in group_names"
+
+    - name: 애플리케이션 데이터베이스 재생성
+      shell: |
+        docker exec mysql-{{ service_name }} mysql \
+          -u root -p{{ db.mysql.root_password }} \
+          -e "CREATE DATABASE {{ db.mysql.name }} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+      when: "'database' in group_names"
+
+    - name: 정리 완료 확인
+      debug:
+        msg: "✅ 애플리케이션 데이터베이스({{ db.mysql.name }}) 정리 완료"
+
+# 전체 데이터베이스 초기화 (위험한 작업)
+- name: "🔄 전체 데이터베이스 초기화"
+  hosts: database
+  become: yes
+  gather_facts: yes
+  tags:
+    - reset
+    - never # 명시적으로 지정해야만 실행
+  tasks:
+    - name: ⚠️ 위험한 작업 경고
+      pause:
+        prompt: |
+          ⚠️ ⚠️ ⚠️ 경고 ⚠️ ⚠️ ⚠️
+          
+          이 작업은 모든 데이터베이스와 데이터를 완전히 삭제합니다!
+          백업이 있는지 확인하셨나요?
+          
+          정말로 전체 데이터베이스를 초기화하시겠습니까? (RESET_ALL/no)
+      register: reset_confirmation
+
+    - name: 초기화 작업 취소
+      fail:
+        msg: "❌ 전체 데이터베이스 초기화가 취소되었습니다."
+      when: reset_confirmation.user_input != 'RESET_ALL'
+
+    - name: MySQL 컨테이너 중지
+      docker_container:
+        name: "mysql-{{ service_name }}"
+        state: stopped
+      when: "'database' in group_names"
+
+    - name: MySQL 데이터 볼륨 삭제
+      docker_volume:
+        name: "mysql_data_{{ service_name }}"
+        state: absent
+      when: "'database' in group_names"
+
+    - name: MySQL 컨테이너와 역할 재실행
+      include_role:
+        name: database
+      when: "'database' in group_names"
+
+    - name: MySQL 서비스 대기
+      wait_for:
+        port: 3306
+        host: "{{ ansible_host }}"
+        timeout: 120
+        delay: 10
+      when: "'database' in group_names"
+
+    - name: 초기화 완료 확인
+      debug:
+        msg: "✅ 전체 데이터베이스 초기화 완료"
+
+# 덤프 파일 임포트
+- name: "📥 덤프 파일 임포트"
+  hosts: database
+  become: yes
+  gather_facts: yes
+  tags:
+    - import
+    - never # 명시적으로 지정해야만 실행
+  vars:
+    dump_file: "{{ dump_file | default('') }}"
+  tasks:
+    - name: 덤프 파일 확인
+      assert:
+        that:
+          - dump_file != ''
+          - dump_file is defined
+        fail_msg: "❌ 덤프 파일을 지정해주세요: -e dump_file=/path/to/dump.sql"
+        success_msg: "✅ 덤프 파일: {{ dump_file }}"
+
+    - name: 덤프 파일 존재 확인
+      stat:
+        path: "{{ dump_file }}"
+      register: dump_file_stat
+
+    - name: 덤프 파일 검증
+      assert:
+        that:
+          - dump_file_stat.stat.exists
+        fail_msg: "❌ 덤프 파일이 존재하지 않습니다: {{ dump_file }}"
+
+    - name: 덤프 파일 임포트 확인
+      pause:
+        prompt: "📥 덤프 파일 '{{ dump_file }}'을 {{ db.mysql.name }} 데이터베이스에 임포트하시겠습니까? (yes/no)"
+      register: import_confirmation
+
+    - name: 임포트 작업 취소
+      fail:
+        msg: "❌ 덤프 파일 임포트가 취소되었습니다."
+      when: import_confirmation.user_input != 'yes'
+
+    - name: 덤프 파일을 서버로 복사
+      copy:
+        src: "{{ dump_file }}"
+        dest: "/tmp/import_dump.sql"
+        mode: "0644"
+        owner: "{{ system.user }}"
+        group: "{{ system.user }}"
+      when: "'database' in group_names"
+
+    - name: 애플리케이션 데이터베이스에 덤프 임포트
+      shell: |
+        docker exec -i mysql-{{ service_name }} mysql \
+          -u root -p{{ db.mysql.root_password }} \
+          {{ db.mysql.name }} < /tmp/import_dump.sql
+      register: import_result
+      when: "'database' in group_names"
+
+    - name: 임포트된 테이블 확인
+      shell: |
+        docker exec mysql-{{ service_name }} mysql \
+          -u root -p{{ db.mysql.root_password }} \
+          -e "USE {{ db.mysql.name }}; SHOW TABLES;"
+      register: tables_list
+      when: "'database' in group_names"
+
+    - name: 임포트 결과 표시
+      debug:
+        msg:
+          - "✅ 덤프 파일 임포트 완료!"
+          - "📋 임포트된 테이블:"
+          - "{{ tables_list.stdout_lines }}"
+      when: import_result is succeeded
+
+    - name: 임시 덤프 파일 정리
+      file:
+        path: "/tmp/import_dump.sql"
+        state: absent
+      when: "'database' in group_names"
+
+# 전체 백업에서 복원
+- name: "🔄 백업에서 전체 복원"
+  hosts: database
+  become: yes
+  gather_facts: yes
+  tags:
+    - restore
+    - never # 명시적으로 지정해야만 실행
+  vars:
+    restore_file: "{{ restore_file | default('') }}"
+  tasks:
+    - name: 복원 파일 확인
+      assert:
+        that:
+          - restore_file != ''
+          - restore_file is defined
+        fail_msg: "❌ 복원할 백업 파일을 지정해주세요: -e restore_file=/path/to/backup.sql"
+        success_msg: "✅ 복원 파일: {{ restore_file }}"
+
+    - name: 백업 파일 존재 확인
+      stat:
+        path: "{{ restore_file }}"
+      register: restore_file_stat
+
+    - name: 백업 파일 검증
+      assert:
+        that:
+          - restore_file_stat.stat.exists
+        fail_msg: "❌ 백업 파일이 존재하지 않습니다: {{ restore_file }}"
+
+    - name: 복원 작업 확인
+      pause:
+        prompt: "⚠️  백업 파일 '{{ restore_file }}'에서 전체 데이터베이스를 복원하시겠습니까? 기존 데이터가 덮어쓰입니다! (yes/no)"
+      register: restore_confirmation
+
+    - name: 복원 작업 취소
+      fail:
+        msg: "❌ 데이터베이스 복원이 취소되었습니다."
+      when: restore_confirmation.user_input != 'yes'
+
+    - name: 전체 데이터베이스 복원
+      shell: |
+        docker exec -i mysql-{{ service_name }} mysql \
+          -u root -p{{ db.mysql.root_password }} < {{ restore_file }}
+      register: restore_result
+      when: "'database' in group_names"
+
+    - name: 복원 상태 확인
+      debug:
+        msg: "✅ 데이터베이스 복원 완료: {{ restore_file }}"
+      when: restore_result is succeeded
+
+# 작업 완료 요약
+- name: "✅ 데이터베이스 관리 작업 완료"
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars:
+    deployment_env: "{{ groups.keys() | select('match', '^(dev|test|prod)$') | list | first | default('unknown') }}"
+  tasks:
+    - name: 작업 완료 알림
+      debug:
+        msg:
+          - "🎉 데이터베이스 관리 작업이 완료되었습니다!"
+          - "🎯 환경: {{ deployment_env | upper }}"
+          - "⏰ 완료 시간: {{ ansible_date_time.iso8601 }}"
+          - ""
+          - "📋 수행된 작업:"
+          - "  {% if 'backup' in ansible_run_tags %}💾 백업 생성{% endif %}"
+          - "  {% if 'reset' in ansible_run_tags %}🔄 전체 초기화{% endif %}"
+          - "  {% if 'restore' in ansible_run_tags %}🔄 백업 복원{% endif %}"
+          - "  {% if 'import' in ansible_run_tags %}📥 덤프 임포트{% endif %}"
+          - "  {% if 'clean' in ansible_run_tags %}🧹 앱 DB 정리{% endif %}"
+          - "  {% if 'status' in ansible_run_tags %}📊 상태 확인{% endif %}"
+          - ""
+          - "🔍 확인 명령어:"
+          - "  ansible-playbook -i {{ deployment_env }}.ini playbooks/db_management.yml --tags status"
+          - "  ansible -i {{ deployment_env }}.ini database -m shell -a 'docker exec mysql-{{ hostvars[groups['database'][0]]['service_name'] if 'database' in groups else 'moongsan' }} mysql -u root -ppass -e \"SHOW DATABASES;\"'"

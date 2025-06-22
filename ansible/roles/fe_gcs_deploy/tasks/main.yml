@@ -74,6 +74,14 @@
         force: yes
       become: true
 
+- name: Fix S3 bucket name in constants.ts (임시 수정)
+  replace:
+    path: "{{ project_paths.fe_repo }}/src/constants.ts"
+    regexp: "moongsan-dev-s3"
+    replace: "{{ aws.s3.bucket }}"
+    backup: yes
+  become: true
+
 - name: Ensure required directories exist
   file:
     path: "{{ item }}"
@@ -180,7 +188,7 @@
 
     # 파일 타입별로 다른 캐시 헤더 설정하여 업로드
     echo "=== 최적화된 캐시 헤더로 업로드 ==="
-    
+
     # 1. HTML 파일 (짧은 캐시, 매번 재검증)
     find "$BUILD_DIR" -name "*.html" -type f | while read file; do
       relative_path=${file#$BUILD_DIR/}
@@ -278,7 +286,7 @@
     # 1단계: 프로젝트의 모든 URL 맵 조회
     echo "프로젝트의 URL 맵 조회 중..."
     URL_MAPS=$(gcloud compute url-maps list --format="value(name)" --filter="name~'{{ env }}'" 2>/dev/null | head -5)
-    
+
     if [ -z "$URL_MAPS" ]; then
       echo "환경별 URL 맵을 찾지 못했습니다. 모든 URL 맵 조회 중..."
       URL_MAPS=$(gcloud compute url-maps list --format="value(name)" 2>/dev/null | head -5)
@@ -334,15 +342,15 @@
 - name: Verify deployment with cache-busting check
   shell: |
     echo "=== 배포 검증 시작 ==="
-    
+
     # 1. 빌드 시간 확인
     BUILD_TIME="{{ ansible_date_time.iso8601 }}"
     echo "빌드 시간: $BUILD_TIME"
-    
+
     # 2. index.html에서 빌드 정보 확인
     sleep 5  # CDN 전파 대기
     echo "Frontend URL 접속 확인..."
-    
+
     RESPONSE=$(curl -s -f "https://{{ fe.api.domain }}/" 2>/dev/null || echo "ERROR")
     if echo "$RESPONSE" | grep -q "VITE_APP_BUILD_TIME" 2>/dev/null; then
       echo "✅ 새로운 빌드가 정상적으로 배포되었습니다."
@@ -353,12 +361,12 @@
       echo "❌ 사이트 접속 실패 또는 빌드 미반영"
       echo "다음 URL을 직접 확인해주세요: https://{{ fe.api.domain }}/"
     fi
-    
+
     # 3. 캐시 우회 URL로 재확인
     echo "캐시 우회 URL로 재확인..."
     CACHE_BYPASS_URL="https://{{ fe.api.domain }}/?cb=$(date +%s)"
     echo "캐시 우회 URL: $CACHE_BYPASS_URL"
-    
+
     exit 0  # 검증 실패해도 배포는 성공으로 처리
   become: false
   register: deployment_verification

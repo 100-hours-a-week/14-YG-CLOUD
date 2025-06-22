@@ -4,7 +4,7 @@ ansible_python_interpreter: /usr/bin/python3
 # 기본 환경 설정
 service_name: moongsan
 env: prod
-branch: main  # 운영환경은 main 브랜치 사용
+branch: dev # 운영환경은 main 브랜치 사용
 
 # 네트워크 정보 (inventory에서 정의된 IP 참조)
 internal_ips:
@@ -45,14 +45,14 @@ project_repos:
   ai_url: "https://github.com/100-hours-a-week/14-YG-AI.git"
   fe_url: "https://github.com/100-hours-a-week/14-YG-FE.git"
   cloud_url: "https://github.com/100-hours-a-week/14-YG-CLOUD.git"
-  cloud_branch: "main"  # 운영환경은 main 브랜치
+  cloud_branch: "main" # 운영환경은 main 브랜치
 
 # Nginx 설정 (운영 도메인)
 nginx:
   domain: "moongsan.com"
   ssl_email: nangmannsh@gmail.com
   devuser: produser
-  devuser_password: "{{ vault_nginx_prod_password }}"  # Vault로 관리
+  devuser_password: "{{ vault_nginx_prod_password }}" # Vault로 관리
 
 # 데이터베이스 설정 (통합) - 운영 환경 최적화
 db:
@@ -61,63 +61,63 @@ db:
     name: "{{ service_name }}_{{ env }}_db"
     url: "jdbc:mysql://{{ internal_ips.database }}:{{ app_ports.mysql }}/{{ service_name }}_{{ env }}_db?serverTimezone=Asia/Seoul"
     user: "{{ service_name }}_admin"
-    password: "{{ vault_mysql_prod_password }}"  # Vault로 관리
+    password: "{{ vault_mysql_prod_password }}" # Vault로 관리
     driver: com.mysql.cj.jdbc.Driver
     root_user: root
-    root_password: "{{ vault_mysql_root_prod_password }}"  # Vault로 관리
+    root_password: "{{ vault_mysql_root_prod_password }}" # Vault로 관리
     host: "{{ internal_ips.database }}"
     port: "{{ app_ports.mysql }}"
-    
+
     # Performance settings - 운영 환경 최적화
     performance:
-      max_connections: 1000             # 운영환경 더 많은 연결 허용
-      max_connect_errors: 10000         # Allow more connection retries
-      connect_timeout: 30               # Connection timeout in seconds
-      wait_timeout: 28800               # 8 hours for long polling
-      interactive_timeout: 28800        # 8 hours for interactive sessions
-      table_open_cache: 8000            # 운영환경 더 많은 테이블 캐시
-      table_definition_cache: 2800      # 운영환경 더 많은 테이블 정의 캐시
-      tmp_table_size: "128M"            # 운영환경 더 큰 임시 테이블
-      max_heap_table_size: "128M"       # 운영환경 더 큰 메모리 테이블
-      thread_cache_size: 100            # 운영환경 더 많은 스레드 캐시
-      thread_stack: "256K"              # Stack size for each thread
+      max_connections: 1000 # 운영환경 더 많은 연결 허용
+      max_connect_errors: 10000 # Allow more connection retries
+      connect_timeout: 30 # Connection timeout in seconds
+      wait_timeout: 28800 # 8 hours for long polling
+      interactive_timeout: 28800 # 8 hours for interactive sessions
+      table_open_cache: 8000 # 운영환경 더 많은 테이블 캐시
+      table_definition_cache: 2800 # 운영환경 더 많은 테이블 정의 캐시
+      tmp_table_size: "128M" # 운영환경 더 큰 임시 테이블
+      max_heap_table_size: "128M" # 운영환경 더 큰 메모리 테이블
+      thread_cache_size: 100 # 운영환경 더 많은 스레드 캐시
+      thread_stack: "256K" # Stack size for each thread
 
     # Character set and collation
     charset:
-      server: "utf8mb4"                 # Full UTF-8 support
-      collation: "utf8mb4_unicode_ci"   # Unicode collation
+      server: "utf8mb4" # Full UTF-8 support
+      collation: "utf8mb4_unicode_ci" # Unicode collation
 
     # InnoDB storage engine settings - 운영 환경 최적화
     innodb:
-      buffer_pool_size: "512M"          # 운영환경 더 큰 버퍼 풀
-      log_file_size: "128M"             # 운영환경 더 큰 로그 파일
-      flush_method: "O_DIRECT"          # Direct I/O for better performance
-      lock_wait_timeout: 50             # InnoDB lock wait timeout
+      buffer_pool_size: "512M" # 운영환경 더 큰 버퍼 풀
+      log_file_size: "128M" # 운영환경 더 큰 로그 파일
+      flush_method: "O_DIRECT" # Direct I/O for better performance
+      lock_wait_timeout: 50 # InnoDB lock wait timeout
 
     # Network settings
     network:
-      max_allowed_packet: "128M"        # 운영환경 더 큰 패킷 크기
-      bind_address: "0.0.0.0"           # Bind to all interfaces
+      max_allowed_packet: "128M" # 운영환경 더 큰 패킷 크기
+      bind_address: "0.0.0.0" # Bind to all interfaces
 
     # Logging configuration - 운영 환경 세밀한 로깅
     logging:
       error_log: "/var/log/mysql/error.log"
-      slow_query_log: 1                 # Enable slow query logging
+      slow_query_log: 1 # Enable slow query logging
       slow_query_log_file: "/var/log/mysql/slow.log"
-      long_query_time: 2                # 운영환경 더 엄격한 슬로우 쿼리 기준
+      long_query_time: 2 # 운영환경 더 엄격한 슬로우 쿼리 기준
 
     # Replication settings
     replication:
-      server_id: 1                      # Unique server identifier
-      log_bin: "mysql-bin"              # Binary log file prefix
-      binlog_format: "ROW"              # Binary log format
+      server_id: 1 # Unique server identifier
+      log_bin: "mysql-bin" # Binary log file prefix
+      binlog_format: "ROW" # Binary log format
 
     # Security settings - 운영 환경 보안 강화
     security:
       sql_mode: "STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO"
 
     # Timezone setting
-    timezone: "+09:00"                  # Asia/Seoul timezone
+    timezone: "+09:00" # Asia/Seoul timezone
 
     # Container settings
     container:
@@ -169,7 +169,7 @@ fe:
       client_id: "{{ vault_kakao_client_id }}"
       redirect_uri: "https://{{ nginx.domain }}/api/oauth/kakao/callback"
       complete_redirect_uri: "https://{{ nginx.domain }}/api/oauth/kakao/callback/complete"
-  
+
   # 빌드 설정
   build:
     build_command: "npm run build"
@@ -200,8 +200,8 @@ be:
 
   # JVM 설정 (운영 환경 최적화)
   jvm:
-    heap_size: "4g"                     # 운영환경 더 큰 힙 크기
-    gc_type: "G1GC"                     # G1 가비지 컬렉터
+    heap_size: "4g" # 운영환경 더 큰 힙 크기
+    gc_type: "G1GC" # G1 가비지 컬렉터
     additional_opts: "-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError"
 
 # Docker 네트워크 설정
@@ -228,6 +228,12 @@ ai:
     api_key: "{{ vault_langsmith_api_key }}"
     project: "Generate_Description_{{ env }}"
 
+  # Langfuse 설정 (추가)
+  langfuse:
+    host: https://us.cloud.langfuse.com/
+    public_key: "{{ vault_langfuse_public_key }}"
+    secret_key: "{{ vault_langfuse_secret_key }}"
+
   # 프록시 설정
   proxies: "{{ vault_proxies }}"
 
@@ -244,8 +250,8 @@ wireguard:
   server_endpoint: "{{ wireguard_server_ip }}:51820"
   server_public_key: "+VE4Cr4Wz9UJRVOYS3CWEpuXo8o9bF3phl/clzKjNHM="
   allowed_ips:
-    - "10.8.0.0/24"   # WireGuard VPN 네트워크
-    - "10.1.0.0/16"   # prod 환경 VPC
+    - "10.8.0.0/24" # WireGuard VPN 네트워크
+    - "10.1.0.0/16" # prod 환경 VPC
     - "172.16.0.0/16" # shared 환경 VPC
   dns: "8.8.8.8, 8.8.4.4"
   environment: "prod"
@@ -258,7 +264,7 @@ aws:
     secret_key: "{{ vault_aws_secret_key }}"
   s3:
     region: ap-northeast-2
-    bucket: "{{ service_name }}-prod-s3"
+    bucket: "{{ service_name }}-s3" # prod 환경용 S3 버킷
 
 # GCP 설정 (운영 환경)
 gcp:
@@ -280,10 +286,10 @@ gcp:
   gcs:
     # Frontend 배포용 설정 (Terraform에서 이미 구축된 인프라)
     fe:
-      bucket_name: "moongsan-prod-frontend"  # Terraform output과 일치
-      project: "ktb-2-moongsan"  # GCP 프로젝트 ID
-      cdn_ip: "34.8.174.93"  # prod Load Balancer IP
-      domain: "{{ nginx.domain }}"  # Terraform에서 설정된 도메인
+      bucket_name: "moongsan-prod-frontend" # Terraform output과 일치
+      project: "ktb-2-moongsan" # GCP 프로젝트 ID
+      cdn_ip: "34.8.174.93" # prod Load Balancer IP
+      domain: "{{ nginx.domain }}" # Terraform에서 설정된 도메인
 
     # Database 백업용 설정
     backup:

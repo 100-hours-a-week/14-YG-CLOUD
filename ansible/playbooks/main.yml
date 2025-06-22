@@ -52,7 +52,7 @@
 
 # 1단계: 기본 시스템 설정
 - name: "1️⃣ 기본 시스템 설정"
-  hosts: test
+  hosts: internal_servers
   become: yes
   gather_facts: yes
   tags:
@@ -151,6 +151,7 @@
   tags:
     - fe_deploy
     - frontend
+    - fe
     - web
     - gcs
     - cdn
