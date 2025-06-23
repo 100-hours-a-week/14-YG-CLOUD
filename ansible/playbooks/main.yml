@@ -99,6 +99,7 @@
   tags:
     - be_deploy
     - backend
+    - be
     - api
   tasks:
     - name: Docker 네트워크 설정
