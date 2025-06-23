@@ -179,7 +179,7 @@ fe:
   # API 엔드포인트 설정
   api:
     base_url: "https://{{ nginx.domain }}"
-    backend_url: "https://{{ nginx.domain }}/api"
+    backend_url: "https://{{ nginx.domain }}/api/"
     ai_url: "https://{{ nginx.domain }}/generation"
     domain: "{{ nginx.domain }}"
 
