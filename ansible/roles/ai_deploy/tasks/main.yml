@@ -20,6 +20,13 @@
     force: yes
     accept_hostkey: yes
 
+- name: Remove existing torch pin from requirements
+  replace:
+    path: /home/ubuntu/14-YG-AI/v1/requirements.txt
+    regexp: "^torch==.*$"
+    replace: ""
+  become: true
+
 - name: Ensure required Python packages are pinned in requirements.txt
   lineinfile:
     path: /home/ubuntu/14-YG-AI/v1/requirements.txt
