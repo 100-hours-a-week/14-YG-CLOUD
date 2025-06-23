@@ -20,41 +20,19 @@
     force: yes
     accept_hostkey: yes
 
-- name: Ensure PyYAML is present with version
+- name: Ensure required Python packages are pinned in requirements.txt
   lineinfile:
     path: /home/ubuntu/14-YG-AI/v1/requirements.txt
-    regexp: "^PyYAML"
-    line: "PyYAML>=6.0"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
     insertafter: EOF
     create: yes
-
-- name: Ensure torch>=2.2.0,<2.3.0 is present
-  lineinfile:
-    path: /home/ubuntu/14-YG-AI/v1/requirements.txt
-    regexp: "^torch"
-    line: "torch>=2.2.0,<2.3.0"
-    insertafter: EOF
-
-- name: Ensure torchvision>=0.15.2,<0.16.0 is present
-  lineinfile:
-    path: /home/ubuntu/14-YG-AI/v1/requirements.txt
-    regexp: "^torchvision"
-    line: "torchvision>=0.15.2,<0.16.0"
-    insertafter: EOF
-
-- name: Ensure numpy<2 is present
-  lineinfile:
-    path: /home/ubuntu/14-YG-AI/v1/requirements.txt
-    regexp: "^numpy"
-    line: "numpy<2"
-    insertafter: EOF
-
-- name: Ensure opencv-python-headless==4.9.0.80 is present
-  lineinfile:
-    path: /home/ubuntu/14-YG-AI/v1/requirements.txt
-    regexp: "^opencv-python-headless"
-    line: "opencv-python-headless==4.9.0.80"
-    insertafter: EOF
+  loop:
+    - {regexp: "^PyYAML", line: "PyYAML>=6.0"}
+    - {regexp: "^torch$", line: "torch>=2.2.0,<2.3.0"}
+    - {regexp: "^torchvision$", line: "torchvision>=0.15.2,<0.16.0"}
+    - {regexp: "^numpy$", line: "numpy<2"}
+    - {regexp: "^opencv-python-headless$", line: "opencv-python-headless==4.9.0.80"}
 
 - name: Copy Dockerfile to AI repo
   template:
