@@ -576,6 +576,146 @@ sudo systemctl restart nginx
 sudo reboot
 ```
 
+## 최신 해결 사례 (2025-06-23)
+
+### 🚨 **문제**: prod 환경 내부 VM에서 인터넷 연결 불가
+
+**증상**:
+```bash
+# prod 내부 VM에서
+ping 8.8.8.8  # 실패
+apt update    # 실패
+```
+원인: NAT Gateway는 생성되었으나 기본 라우트(prod-default-route)가 누락
+
+✅ 해결방법:
+```bash
+# 1. 누락된 라우트 생성
+gcloud compute routes create prod-default-route \
+    --project=moongsan-admin \
+    --network=prod-vpc \
+    --destination-range=0.0.0.0/0 \
+    --next-hop-gateway=projects/moongsan-admin/global/gateways/default-internet-gateway \
+    --priority=1000
+
+# 2. Terraform 상태에 임포트
+terraform import google_compute_route.prod_default_route prod-default-route
+
+# 3. 상태 확인
+terraform plan  # No changes 확인
+```
+
+🚨 문제: AI 서비스 ChromeDriver 버전 불일치
+증상:
+
+```bash
+# AI 컨테이너 로그에서
+selenium.common.exceptions.SessionNotCreatedException: Message: session not created: 
+This version of ChromeDriver only supports Chrome version 114
+Current browser version is 131.0.6778.108
+```
+원인: Chrome 137+ 버전에 대한 ChromeDriver API 변경
+
+✅ 해결방법 (Dockerfile.j2 수정):
+```Docker
+# Chrome for Testing API 사용
+RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}') && \
+    if [[ "$CHROME_VERSION" > "114" ]]; then \
+        wget -O /tmp/chromedriver.zip \
+             "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chromedriver-linux64.zip" && \
+        cd /tmp && \
+        unzip chromedriver.zip && \
+        mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver; \
+    else \
+        # 기존 방식 유지
+        CHROME_MAJOR=${CHROME_VERSION%%.*} && \
+        DRIVER_VERSION=$(curl -fsS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR}") && \
+        wget -O /tmp/chromedriver.zip \
+             "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip"; \
+    fi
+```
+
+🚨 문제: AI 서비스 GCP 인증 실패
+증상:
+```bash
+# AI 컨테이너 로그에서
+google.auth.exceptions.MalformedError: Unable to parse JSON key file: Expecting ',' delimiter
+```
+원인: service-account.json의 private_key 필드에 개행 문자 처리 문제
+
+✅ 해결방법 (service-account.json.j2 수정):
+```json
+{
+  "private_key": "{{ gcp.ai.private_key | trim | replace('\n', '\\n') }}"
+}
+```
+
+🚨 문제: AI 서비스 Backend API 엔드포인트 파싱 오류
+
+증상:
+```bash
+# AI 컨테이너 로그에서
+requests.exceptions.InvalidURL: Invalid URL '/users/token': No scheme supplied.
+```
+원인: BACKEND_URL에 /api 경로 누락
+
+✅ 해결방법 (group_vars/prod/all.yml 수정):
+```yaml
+ai:
+  backend_url: "http://{{ internal_ips.backend }}:{{ app_ports.backend }}/api"
+```
+
+🚨 문제: 프론트엔드 배포 시 S3 버킷명 하드코딩
+증상: constants.ts에 하드코딩된 버킷명으로 환경별 배포 불가
+
+✅ 해결방법 (fe_gcs_deploy 역할에 추가):
+```yaml
+- name: Replace S3 bucket name in constants.ts
+  replace:
+    path: "{{ project_paths.fe_repo }}/src/constants.ts"
+    regexp: 'S3_BUCKET_NAME\s*=\s*["\'][^"\']*["\']'
+    replace: 'S3_BUCKET_NAME = "{{ gcs.frontend.bucket_name }}"'
+```
+🚨 문제: 운영 DB 덤프 임포트 자동화 필요
+
+✅ 해결방법 (simple_db_fix.yml 플레이북 생성):
+```yaml
+- name: Import database dump to production
+  mysql_db:
+    name: "{{ mysql.database }}"
+    state: import
+    target: /tmp/dump.sql
+    login_host: "{{ internal_ips.database }}"
+    login_user: "{{ mysql.user }}"
+    login_password: "{{ mysql.password }}"
+```
+사용법:
+```bash
+ansible-playbook -i prod.ini playbooks/simple_db_fix.yml
+```
+🚨 문제: Terraform 상태와 실제 인프라 불일치
+
+증상: terraform plan에서 이미 존재하는 리소스를 생성하려고 시도
+
+✅ 해결방법:
+```bash
+# 1. 기존 리소스를 상태에 임포트
+terraform import google_compute_route.prod_default_route prod-default-route
+
+# 2. 상태 확인
+terraform state list
+
+# 3. 계획 검증
+terraform plan  # "No changes" 나와야 함
+```
+🚨 문제: DBeaver를 통한 prod DB 직접 접속
+
+✅ 해결방법:
+```conf
+Connection Settings:
+- Host: 10.1.0.2 (내부 IP - WireGuard VPN 필요)
+```
+
 ### 📞 에스컬레이션 절차
 
 1. **Level 1**: 자동 복구 시도 (스크립트)

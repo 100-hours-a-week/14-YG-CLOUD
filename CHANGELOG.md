@@ -65,3 +65,26 @@
 - 백엔드: Node.js API 서버
 - 데이터베이스: Redis 캐시가 포함된 PostgreSQL
 - AI 서비스: Python 기반 AI 처리
+
+## [미출시]
+
+### 추가 (2025-06-23)
+- **Production Infrastructure**: prod 환경 NAT Gateway 및 네트워크 라우팅 완전 구성
+- **Database Operations**: 운영 DB 덤프 자동 임포트 시스템 (simple_db_fix.yml)
+- **AI Service Optimization**: ChromeDriver 자동 버전 매칭 및 GCP 인증 시스템
+- **Frontend Automation**: GCS 배포 시 S3 버킷명 자동 치환 기능
+- **Documentation Cleanup**: docs 디렉토리 핵심 문서만 유지 (5개 → 정리 완료)
+
+### 수정 (2025-06-23)
+- **Network Infrastructure**: prod 환경 내부 VM 인터넷 연결 문제 해결
+- **Terraform State**: 인프라 실제 상태와 코드 동기화 완료
+- **Ansible Vault**: 민감정보 관리 체계 정비 및 배포 자동화
+- **AI Service Endpoints**: backend_url에 /api 경로 추가로 API 호출 문제 해결
+- **GCP Authentication**: AI 서비스 Service Account JSON private_key 인코딩 문제 해결
+
+### 해결된 문제들
+- **NAT Gateway 라우팅**: prod-default-route 누락으로 인한 내부 VM 인터넷 접속 불가
+- **Terraform 상태 불일치**: 실제 리소스와 terraform state 불일치 문제
+- **AI ChromeDriver**: Chrome 137+ 버전 호환성 및 자동 다운로드 문제
+- **Database Connection**: DBeaver를 통한 prod DB 직접 접속 환경 구성
+- **Frontend Deployment**: constants.ts의 하드코딩된 S3 버킷명 동적 치환
