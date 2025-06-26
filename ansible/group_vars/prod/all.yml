@@ -167,8 +167,8 @@ fe:
   oauth:
     kakao:
       client_id: "{{ vault_kakao_client_id }}"
-      redirect_uri: "https://{{ nginx.domain }}/api/oauth/kakao/callback"
-      complete_redirect_uri: "https://{{ nginx.domain }}/api/oauth/kakao/callback/complete"
+      redirect_uri: "https://{{ nginx.domain }}/kakao/callback"
+      complete_redirect_uri: "https://{{ nginx.domain }}/kakao/callback/complete"
 
   # 빌드 설정
   build:
@@ -195,8 +195,8 @@ be:
   oauth:
     kakao:
       client_id: "{{ vault_kakao_client_id }}"
-      redirect_uri: "https://{{ nginx.domain }}/api/oauth/kakao/callback"
-      complete_redirect_uri: "https://{{ nginx.domain }}/api/oauth/kakao/callback/complete"
+      redirect_uri: "https://{{ nginx.domain }}/kakao/callback"
+      complete_redirect_uri: "https://{{ nginx.domain }}/kakao/callback/complete"
 
   # JVM 설정 (운영 환경 최적화)
   jvm:
@@ -238,7 +238,7 @@ ai:
   proxies: "{{ vault_proxies }}"
 
   # 백엔드 URL 설정
-  backend_url: "http://{{ internal_ips.backend }}:{{ app_ports.backend }}"
+  backend_url: "http://{{ internal_ips.backend }}:{{ app_ports.backend }}/"
 
   # Python 환경 설정
   python:
