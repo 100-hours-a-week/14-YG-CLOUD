@@ -1,0 +1,29 @@
+# APM Server 설정 파일 (8.x 호환)
+# ================================= APM Server =================================
+
+apm-server:
+  # APM Server가 수신할 호스트 및 포트
+  host: "0.0.0.0:8200"
+  
+  # RUM (Real User Monitoring) 설정
+  rum:
+    enabled: true
+    event_rate:
+      limit: 300
+    allow_origins: ["*"]
+
+# ================================= Elasticsearch Output ===================
+
+output.elasticsearch:
+  hosts: ["https://localhost:9200"]
+  username: "elastic"
+  password: "{{ elk_password }}"
+  ssl.verification_mode: none
+
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/apm-server
+  name: apm-server
+  keepfiles: 7
+  permissions: 0644

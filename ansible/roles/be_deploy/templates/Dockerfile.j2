@@ -11,7 +11,13 @@ RUN ./gradlew clean bootJar -x test
 
 FROM eclipse-temurin:21-jdk
 WORKDIR /app
+
+# APM Java Agent 다운로드
+ADD https://repo1.maven.org/maven2/co/elastic/apm/elastic-apm-agent/1.50.0/elastic-apm-agent-1.50.0.jar /elastic-apm-agent.jar
+
 COPY config/application.yml ./config/application-secrets.yml
 RUN mkdir -p /var/moongsan/log && chown -R 1000:1000 /var/moongsan/log
 COPY --from=builder /app/build/libs/*.jar app.jar
-CMD ["sh", "-c", "java -jar app.jar | tee -a /var/moongsan/log/be_moongsan.log"]
+
+# APM Agent와 함께 실행
+CMD ["sh", "-c", "java -javaagent:/elastic-apm-agent.jar -jar app.jar | tee -a /var/moongsan/log/be_moongsan.log"]

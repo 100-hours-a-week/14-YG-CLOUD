@@ -1,0 +1,25 @@
+---
+- name: Install and Configure APM Server
+  hosts: shared
+  become: yes
+  vars:
+    elk_password: "Dp8OiiQKmKg6wcxjK4P="
+
+  roles:
+    - apm_server
+
+  post_tasks:
+    - name: APM Server 설치 확인
+      debug:
+        msg: "APM Server가 성공적으로 설치되었습니다. 포트 8200에서 실행 중입니다."
+
+    - name: APM Server 연결 테스트
+      uri:
+        url: "http://localhost:8200/"
+        method: GET
+      register: apm_health_check
+      ignore_errors: yes
+
+    - name: APM Server 상태 출력
+      debug:
+        var: apm_health_check

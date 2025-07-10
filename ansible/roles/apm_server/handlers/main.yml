@@ -1,0 +1,5 @@
+---
+- name: restart apm-server
+  systemd:
+    name: apm-server
+    state: restarted

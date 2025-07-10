@@ -1,0 +1,50 @@
+---
+- name: APM Server 패키지 설치
+  apt:
+    name: apm-server=8.18.3
+    state: present
+    update_cache: yes
+
+- name: APM Server 설정 파일 백업
+  copy:
+    src: /etc/apm-server/apm-server.yml
+    dest: /etc/apm-server/apm-server.yml.backup
+    remote_src: yes
+  ignore_errors: yes
+
+- name: APM Server 설정 파일 생성
+  template:
+    src: apm-server.yml.j2
+    dest: /etc/apm-server/apm-server.yml
+    owner: root
+    group: apm-server
+    mode: "0640"
+  notify: restart apm-server
+
+- name: APM Server 서비스 활성화 및 시작
+  systemd:
+    name: apm-server
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: APM Server 상태 확인
+  systemd:
+    name: apm-server
+    state: started
+  register: apm_service_status
+
+- name: APM Server 포트 확인 (8200)
+  wait_for:
+    port: 8200
+    host: localhost
+    timeout: 30
+  ignore_errors: yes
+
+- name: 방화벽에서 APM Server 포트 허용 (ufw)
+  ufw:
+    rule: allow
+    port: 8200
+    proto: tcp
+  when: ansible_os_family == "Debian"
+  ignore_errors: yes
