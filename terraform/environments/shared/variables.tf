@@ -24,7 +24,7 @@ variable "jumpbox_name" {
 variable "jumpbox_machine_type" {
   description = "Jumpbox 머신 타입"
   type        = string
-  default     = "e2-small"
+  default     = "e2-medium"  # 1vCPU, 4GB RAM
 }
 
 variable "jumpbox_disk_size" {
@@ -82,4 +82,52 @@ variable "tags" {
   description = "리소스 태그"
   type        = list(string)
   default     = ["shared", "management", "jumpbox"]
+}
+
+variable "elk_name" {
+  description = "ELK 인스턴스 이름"
+  type        = string
+  default     = "shared-elk"
+}
+
+variable "elk_machine_type" {
+  description = "ELK 머신 타입 (예: e2-standard-2, custom-2-12288 등)"
+  type        = string
+  default     = "custom-1-6656"  # 1vCPU, 6.5GB RAM
+}
+
+variable "elk_disk_size" {
+  description = "ELK 디스크 크기 (GB)"
+  type        = number
+  default     = 50
+}
+
+variable "elk_image_family" {
+  description = "ELK OS 이미지 패밀리"
+  type        = string
+  default     = "ubuntu-2204-lts"
+}
+
+variable "elk_subnet_name" {
+  description = "ELK 인스턴스가 속할 서브넷 이름"
+  type        = string
+  default     = "shared-subnet"
+}
+
+variable "elk_tags" {
+  description = "ELK 인스턴스 리소스 태그"
+  type        = list(string)
+  default     = ["shared", "elk"]
+}
+
+variable "elk_ssh_user" {
+  description = "ELK 인스턴스 SSH 사용자명"
+  type        = string
+  default     = "lsh"
+}
+
+variable "elk_firewall_source_ranges" {
+  description = "ELK 인스턴스 방화벽 허용 소스 IP 범위"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
 }

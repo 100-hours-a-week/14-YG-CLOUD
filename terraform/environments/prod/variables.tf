@@ -49,19 +49,19 @@ variable "ssh_public_key_path" {
 variable "database_machine_type" {
   description = "Database server machine type"
   type        = string
-  default     = "e2-standard-2"
+  default     = "custom-1-6656"  # 1vCPU, 6.5GB RAM
 }
 
 variable "backend_machine_type" {
   description = "Backend server machine type"
   type        = string
-  default     = "e2-standard-2"
+  default     = "custom-1-6656"  # 1vCPU, 6.5GB RAM
 }
 
 variable "ai_machine_type" {
   description = "AI server machine type"
   type        = string
-  default     = "e2-highmem-2"
+  default     = "e2-highmem-2"  # AI 서버는 유지 (2vCPU, 16GB RAM)
 }
 
 # 네트워크 설정

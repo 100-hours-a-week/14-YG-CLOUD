@@ -4,7 +4,7 @@
 resource "google_compute_network_peering" "shared_to_environments" {
   for_each = var.environment_vpcs
 
-  name         = "${var.project_name}-shared-to-${each.key}"
+  name         = "shared-to-${each.key}-peering"
   network      = var.shared_vpc_self_link
   peer_network = each.value
 
@@ -14,14 +14,14 @@ resource "google_compute_network_peering" "shared_to_environments" {
 
   # 서브넷 라우트 Import/Export 허용  
   import_subnet_routes_with_public_ip = false
-  export_subnet_routes_with_public_ip = false
+  export_subnet_routes_with_public_ip = true
 }
 
 # 환경별 VPC에서 공유 VPC로의 피어링 (양방향)
 resource "google_compute_network_peering" "environments_to_shared" {
   for_each = var.environment_vpcs
 
-  name         = "${var.project_name}-${each.key}-to-shared"
+  name         = "${each.key}-to-shared-peering"
   network      = each.value
   peer_network = var.shared_vpc_self_link
 
@@ -31,7 +31,7 @@ resource "google_compute_network_peering" "environments_to_shared" {
 
   # 서브넷 라우트 Import/Export 허용
   import_subnet_routes_with_public_ip = false
-  export_subnet_routes_with_public_ip = false
+  export_subnet_routes_with_public_ip = true
 
   # 피어링 의존성 설정
   depends_on = [google_compute_network_peering.shared_to_environments]

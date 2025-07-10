@@ -46,6 +46,7 @@ resource "google_compute_instance" "shared_jumpbox" {
   name         = var.jumpbox_name
   machine_type = var.jumpbox_machine_type
   zone         = var.zone
+  can_ip_forward = true
 
   boot_disk {
     initialize_params {
@@ -130,8 +131,12 @@ resource "google_compute_firewall" "allow_environment_access" {
 
 # 기존 환경별 VPC 정보 가져오기 (data source)
 # 현재 배포된 환경들만 포함
-data "google_compute_network" "test_vpc" {
-  name = "moongsan-test-vpc"
+# data "google_compute_network" "test_vpc" {
+#   name = "moongsan-test-vpc"
+# }
+
+data "google_compute_network" "prod-vpc" {
+  name = "prod-vpc"
 }
 
 # VPC 피어링 모듈 - 공유 VPC와 환경별 VPC 연결
@@ -142,9 +147,46 @@ module "vpc_peering" {
   shared_vpc_self_link = google_compute_network.shared_vpc.self_link
   
   environment_vpcs = {
-    test = data.google_compute_network.test_vpc.self_link
+    # test = data.google_compute_network.test_vpc.self_link
     # dev와 prod는 해당 환경 배포 후 추가
     # dev  = data.google_compute_network.dev_vpc.self_link
-    # prod = data.google_compute_network.prod_vpc.self_link
+    prod = data.google_compute_network.prod-vpc.self_link
   }
+}
+
+resource "google_compute_instance" "elk" {
+  name         = var.elk_name
+  machine_type = var.elk_machine_type
+  zone         = var.zone
+
+  boot_disk {
+    initialize_params {
+      image  = "ubuntu-os-cloud/${var.elk_image_family}"
+      size   = var.elk_disk_size
+    }
+  }
+
+  network_interface {
+    subnetwork = var.elk_subnet_name
+    access_config {}
+  }
+
+  tags = var.elk_tags
+
+  metadata = {
+    ssh-keys = "${var.elk_ssh_user}:${var.ssh_public_key}"
+  }
+}
+
+resource "google_compute_firewall" "elk_allow" {
+  name    = "elk-allow"
+  network = google_compute_network.shared_vpc.name
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22", "5044", "5601", "9200", "9600", "8200"]  # 8200: APM Server
+  }
+
+  source_ranges = var.elk_firewall_source_ranges  # 운영자 IP, 내부 VPC 등
+  target_tags   = var.elk_tags
 }

@@ -24,6 +24,10 @@ app_ports:
 system:
   user: ubuntu
 
+# 배포 설정 (임시 조치)
+deployment:
+  remove_validation_annotations: true # @ProfanitySafe, @XssSafe 어노테이션 제거 여부
+
 # 프로젝트 경로 (상위 레벨 변수 참조)
 paths:
   base: "/var/{{ service_name }}"
@@ -204,6 +208,15 @@ be:
     gc_type: "G1GC" # G1 가비지 컬렉터
     additional_opts: "-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError"
 
+  # APM 설정
+  apm:
+    service_name: "backend-moongsan"
+    server_urls: "http://34.47.84.135:8200"
+    environment: "{{ env }}"
+    log_level: "INFO"
+    capture_body: "errors"
+    capture_headers: "true"
+
 # Docker 네트워크 설정
 docker:
   network_name: "moongsan-net"
@@ -233,6 +246,14 @@ ai:
     host: https://us.cloud.langfuse.com/
     public_key: "{{ vault_langfuse_public_key }}"
     secret_key: "{{ vault_langfuse_secret_key }}"
+
+  # APM 설정
+  apm:
+    service_name: "ai-moongsan"
+    server_url: "http://34.47.84.135:8200"
+    environment: "{{ env }}"
+    capture_body: "errors"
+    capture_headers: "true"
 
   # 프록시 설정
   proxies: "{{ vault_proxies }}"
@@ -265,6 +286,7 @@ aws:
   s3:
     region: ap-northeast-2
     bucket: "{{ service_name }}-s3" # prod 환경용 S3 버킷
+    base_url: "https://{{ service_name }}-s3.s3.ap-northeast-2.amazonaws.com/"
 
 # GCP 설정 (운영 환경)
 gcp:
