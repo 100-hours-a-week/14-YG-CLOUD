@@ -89,7 +89,7 @@ resource "google_compute_backend_service" "backend_service" {
   protocol                = "HTTP"
   port_name              = "http"
   load_balancing_scheme  = "EXTERNAL"
-  timeout_sec            = 30
+  timeout_sec            = 120  # AI 생성 API 호출을 위해 타임아웃 증가 (2025-07-08)
   enable_cdn             = false
 
   backend {

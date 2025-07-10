@@ -170,7 +170,7 @@ resource "google_compute_route" "prod_default_route" {
 # Database 서버 (MySQL + Redis + MongoDB)
 resource "google_compute_instance" "prod_database" {
   name         = "prod-database"
-  machine_type = "e2-standard-2"  # 2 vCPU, 8GB RAM
+  machine_type = var.database_machine_type  # custom-1-6656 (1vCPU, 6.5GB RAM)
   zone         = var.zone
 
   boot_disk {
@@ -200,7 +200,7 @@ resource "google_compute_instance" "prod_database" {
 # Backend 서버 (Spring Boot API)
 resource "google_compute_instance" "prod_backend" {
   name         = "prod-backend"
-  machine_type = "e2-standard-2"  # 2 vCPU, 8GB RAM
+  machine_type = var.backend_machine_type  # custom-1-6656 (1vCPU, 6.5GB RAM)
   zone         = var.zone
 
   boot_disk {
@@ -230,7 +230,7 @@ resource "google_compute_instance" "prod_backend" {
 # AI 서버 (FastAPI)
 resource "google_compute_instance" "prod_ai" {
   name         = "prod-ai"
-  machine_type = "e2-highmem-2"  # 2 vCPU, 16GB RAM
+  machine_type = var.ai_machine_type  # e2-highmem-2 (2vCPU, 16GB RAM)
   zone         = var.zone
 
   boot_disk {
@@ -327,7 +327,7 @@ resource "google_compute_backend_service" "prod_backend_service" {
   protocol              = "HTTP"
   port_name             = "http"
   load_balancing_scheme = "EXTERNAL"
-  timeout_sec           = 30
+  timeout_sec           = 120  # AI 생성 API 호출을 위해 타임아웃 증가 (2025-07-08)
   health_checks         = [google_compute_health_check.prod_backend_health.id]
 
   backend {

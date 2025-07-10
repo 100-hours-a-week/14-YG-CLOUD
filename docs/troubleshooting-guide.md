@@ -11,6 +11,7 @@
 - [네트워크 연결 문제해결](#네트워크-연결-문제해결)
   - [Backend → MySQL 연결 문제 (완전한 해결 가이드)](#문제-backend에서-mysql-database-연결-실패-완전한-해결-가이드)
 - [보안 관련 문제해결](#보안-관련-문제해결)
+- [로그 수집 문제해결](#로그수집문제해결)
 
 ---
 
@@ -337,6 +338,95 @@ gcloud logging read "resource.type=http_load_balancer"
 
 ## 네트워크 연결 문제해결
 
+### 🕒 API 타임아웃 문제
+
+#### **문제**: `/api/generation/description` 엔드포인트 30초 타임아웃 (2025-07-08 해결됨)
+
+**증상**:
+```bash
+# Frontend에서 API 호출 시
+Request timeout after 30 seconds
+504 Gateway Timeout
+
+# 브라우저 네트워크 탭에서
+Status: 504 (Gateway Timeout)
+Time: 30.0 seconds
+```
+
+**근본 원인**: 
+- GCP Load Balancer의 `prod-backend-service`가 30초 타임아웃으로 설정
+- AI 생성 작업은 일반적으로 30초 이상 소요
+- URL 라우팅: `/api/generation/*` → `prod-backend-service` (30초) vs `/generation/*` → `prod-ai-service` (120초)
+
+**해결 방법**:
+
+**1단계: 현재 타임아웃 설정 확인**
+```bash
+# 백엔드 서비스 타임아웃 확인
+gcloud compute backend-services list --format="table(name,timeoutSec,protocol)"
+
+# 결과 예시:
+# NAME                  TIMEOUT_SEC  PROTOCOL
+# prod-ai-service       120          HTTP
+# prod-backend-service  30           HTTP  <- 문제 발생 지점
+```
+
+**2단계: URL 라우팅 확인**
+```bash
+# URL 맵 라우팅 규칙 확인
+gcloud compute url-maps describe prod-url-map --format="yaml" | grep -A 20 pathMatchers
+
+# 라우팅 규칙:
+# /api/* → prod-backend-service (30초)
+# /generation/* → prod-ai-service (120초)
+# 따라서 /api/generation/* 은 백엔드 서비스로 라우팅됨
+```
+
+**3단계: 타임아웃 증가 (권장 해결책)**
+```bash
+# 백엔드 서비스 타임아웃을 120초로 증가
+gcloud compute backend-services update prod-backend-service --timeout=120 --global
+
+# 적용 확인
+gcloud compute backend-services list --format="table(name,timeoutSec,protocol)"
+# prod-backend-service도 120초로 변경됨을 확인
+```
+
+**4단계: 대안 해결책 (URL 라우팅 변경)**
+```bash
+# 만약 세밀한 제어가 필요한 경우:
+# /api/generation/* 패턴을 AI 서비스로 라우팅하도록 URL 맵 수정
+gcloud compute url-maps edit prod-url-map
+
+# pathRules에 추가:
+# - paths:
+#   - /api/generation/*
+#   service: https://www.googleapis.com/compute/v1/projects/PROJECT_ID/global/backendServices/prod-ai-service
+```
+
+**검증 방법**:
+```bash
+# 1. 타임아웃 설정 확인
+gcloud compute backend-services describe prod-backend-service --global --format="value(timeoutSec)"
+
+# 2. API 테스트
+curl -X POST "https://your-domain.com/api/generation/description" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "test"}' \
+  --max-time 150  # 120초 + 여유시간
+
+# 3. ELK 로그 모니터링
+# Kibana에서 타임아웃 관련 로그 확인
+```
+
+**예방 조치**:
+- 모든 백엔드 서비스의 타임아웃을 AI 작업에 맞게 설정 (120초 이상)
+- URL 라우팅 규칙을 명확히 문서화
+- ELK Stack에서 타임아웃 관련 알람 설정
+- AI 작업의 경우 비동기 처리 고려
+
+---
+
 ### 🔗 서비스 간 통신 문제
 
 #### **문제**: Backend에서 MySQL Database 연결 실패 (완전한 해결 가이드)
@@ -538,43 +628,246 @@ ansible-vault create group_vars/all/vault.yml
 
 ---
 
-## 🆘 긴급 상황 대응
+## 로그 수집 문제해결
 
-### 🚨 서비스 완전 중단
+## 🚨 로그 수집 중단 문제 (2025-07-10 완전 해결)
 
-#### **1단계: 즉시 확인사항**
+### 🔍 문제 식별 방법
+
+#### 1. 증상 확인
 ```bash
-# 모든 서비스 상태 한번에 확인
-curl -f http://LB_IP/health || echo "Load Balancer 문제"
-ping -c 3 10.0.0.2 || echo "Backend 네트워크 문제"  
-ping -c 3 10.0.0.3 || echo "Database 네트워크 문제"
+# Kibana 대시보드에서 최신 로그 부재 확인
+# 또는 직접 Elasticsearch 쿼리
+curl -k -u elastic:PASSWORD 'https://elk.moongsan.com:9200/moongsan-logs-$(date +%Y.%m.%d)/_search?size=1&sort=@timestamp:desc'
 ```
 
-#### **2단계: 로그 수집**
+#### 2. 로그 수집 파이프라인 상태 체크
 ```bash
-# 시스템 로그
-sudo journalctl -xe
-
-# Docker 로그  
-sudo docker logs --tail 100 backend-container
-sudo docker logs --tail 100 database-container
-
-# Nginx 로그
-sudo tail -f /var/log/nginx/error.log
+# 자동화된 상태 체크 스크립트 실행
+./elk-configs/scripts/check-log-pipeline-health.sh
 ```
 
-#### **3단계: 서비스 재시작**
+#### 3. 서비스별 상태 확인
 ```bash
-# Docker 컨테이너 재시작
-sudo docker restart backend-container
-sudo docker restart database-container
+# ELK 서버 서비스들
+ssh lsh@elk.moongsan.com "sudo systemctl status elasticsearch logstash kibana"
 
-# Nginx 재시작
-sudo systemctl restart nginx
-
-# 전체 VM 재부팅 (최후 수단)
-sudo reboot
+# 각 서버의 Filebeat 상태
+ssh ubuntu@10.1.0.3 "sudo systemctl status filebeat"  # Backend
+ssh ubuntu@10.1.0.4 "sudo systemctl status filebeat"  # AI
 ```
+
+### 🚨 공통 원인들과 해결법
+
+#### 원인 1: Elasticsearch 인증 문제 (가장 빈번)
+**증상**: Logstash가 401 Unauthorized 에러 발생
+```bash
+# 문제 확인
+sudo journalctl -u logstash | grep "401\|unauthorized"
+
+# 해결: 패스워드 재설정
+sudo /usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic
+# 새 패스워드를 Logstash 설정에 반영
+sudo nano /etc/logstash/conf.d/beats-input.conf
+sudo systemctl restart logstash
+```
+
+#### 원인 2: Logstash 파이프라인 오류
+**증상**: Logstash가 실행 중이지만 로그 처리 안됨
+```bash
+# 문제 확인
+sudo tail -f /var/log/logstash/logstash-plain.log
+
+# 해결: 설정 검증 후 재시작
+sudo /usr/share/logstash/bin/logstash --config.test_and_exit
+sudo systemctl restart logstash
+```
+
+#### 원인 3: Filebeat 연결 문제
+**증상**: Filebeat가 Logstash에 연결하지 못함
+```bash
+# 문제 확인
+sudo tail -f /var/log/filebeat/filebeat
+
+# 해결: Logstash 연결 테스트
+telnet 10.100.0.4 5044
+sudo systemctl restart filebeat
+```
+
+### 🔧 단계별 진단 프로세스
+
+#### Step 1: 서비스 상태 확인
+```bash
+# 모든 핵심 서비스 상태 한번에 확인
+for service in elasticsearch logstash kibana; do
+  echo "=== $service ==="
+  ssh lsh@elk.moongsan.com "sudo systemctl is-active $service"
+done
+```
+
+#### Step 2: 네트워크 연결 확인
+```bash
+# Filebeat -> Logstash 연결 테스트
+ssh ubuntu@10.1.0.3 "telnet 10.100.0.4 5044"
+
+# Logstash -> Elasticsearch 연결 테스트  
+ssh lsh@elk.moongsan.com "curl -k https://localhost:9200/_cluster/health"
+```
+
+#### Step 3: 인증 및 권한 확인
+```bash
+# Elasticsearch 인증 테스트
+curl -k -u elastic:PASSWORD 'https://elk.moongsan.com:9200/_cluster/health'
+
+# 인덱스 생성 권한 테스트
+curl -k -u elastic:PASSWORD -X PUT 'https://elk.moongsan.com:9200/test-index'
+```
+
+#### Step 4: 로그 파일 점검
+```bash
+# 각 구성요소별 로그 확인
+sudo tail -f /var/log/elasticsearch/elasticsearch.log
+sudo tail -f /var/log/logstash/logstash-plain.log  
+sudo tail -f /var/log/filebeat/filebeat
+```
+
+### 📋 예방 조치 체크리스트
+
+#### 정기 모니터링 (일주일마다)
+- [ ] 로그 수집 파이프라인 상태 체크
+- [ ] 인덱스 크기 및 문서 수 모니터링
+- [ ] 각 서비스 메모리/CPU 사용률 확인
+
+#### 인증 정보 관리
+- [ ] Elasticsearch 패스워드 변경 시 연관 서비스 업데이트
+- [ ] Ansible vault에 중앙화된 인증 정보 관리
+- [ ] 패스워드 변경 후 전체 파이프라인 테스트
+
+#### 자동화 도구 활용
+```bash
+# 정기 상태 체크를 위한 cron 설정
+0 */6 * * * /path/to/elk-configs/scripts/check-log-pipeline-health.sh
+```
+
+### 🎯 문제별 빠른 해결 가이드
+
+| 문제 유형 | 주요 증상 | 빠른 해결 |
+|----------|----------|----------|
+| **인증 문제** | 401 에러, unauthorized | 패스워드 재설정 → Logstash 재시작 |
+| **네트워크 문제** | Connection refused | 방화벽/보안그룹 확인 |
+| **설정 문제** | Pipeline 시작 실패 | 설정 검증 → 문법 오류 수정 |
+| **용량 문제** | Disk full, 메모리 부족 | 오래된 인덱스 삭제, 메모리 증설 |
+
+### 💡 추가 팁
+
+#### APM vs 로그 수집 구분하기
+- **APM**: apm-* 인덱스, 성능 메트릭
+- **로그 수집**: moongsan-logs-* 인덱스, 애플리케이션 로그
+- **독립적 파이프라인**: 하나가 문제여도 다른 하나는 정상 작동 가능
+
+#### 최신 패스워드 관리
+```bash
+# Ansible 변수로 중앙 관리
+# ansible/group_vars/shared/elk.yml 참조
+elk.elasticsearch.password: "현재_패스워드"
+```
+
+--- 
+:exception=>LogStash::Outputs::ElasticSearch::HttpClient::Pool::HostUnreachableError, 
+:message=>"Elasticsearch Unreachable: [https://localhost:9200/][Manticore::SocketException] 
+Connect to localhost:9200 [localhost/127.0.0.1] failed: Connection refused"}
+```
+
+**근본 원인**: Elasticsearch 인증 설정 변경 후 Logstash가 기존 연결을 재사용하려 시도했으나 실패
+
+### 해결 방법
+
+#### 1. 즉시 해결 (재시작)
+```bash
+# ELK 서버에서 Logstash 재시작
+sudo systemctl restart logstash
+
+# 재시작 후 상태 확인
+sudo systemctl status logstash
+```
+
+#### 2. 연결 확인
+```bash
+# Elasticsearch 연결 테스트
+curl -k -u elastic:PASSWORD 'https://localhost:9200/_cluster/health'
+
+# Logstash 로그 모니터링
+sudo journalctl -u logstash --no-pager -f
+```
+
+#### 3. 성공 지표
+```bash
+# 로그에서 이런 메시지가 보이면 성공
+[INFO ][logstash.outputs.elasticsearch][main] Restored connection to ES instance
+[INFO ][logstash.outputs.elasticsearch][main] Elasticsearch version determined (8.18.3)
+```
+
+### 결과 확인
+
+#### 인덱스 데이터 확인
+```bash
+# 수집된 인덱스 목록 확인
+curl -k -u elastic:PASSWORD -s 'https://localhost:9200/_cat/indices?v' | grep moongsan
+
+# 최신 로그 확인  
+curl -k -u elastic:PASSWORD -s 'https://localhost:9200/moongsan-logs-2025.07.09/_search?size=3&sort=@timestamp:desc'
+```
+
+#### 예상 결과
+- 수백만 개의 로그 데이터 확인
+- AI 서비스: `service: ai-moongsan`, `server: ai`
+- Backend 서비스: `service: [backend-api, backend-service]`, `server: backend`
+
+### 예방 조치
+
+#### 1. 모니터링 알림 설정
+```bash
+# Logstash 상태 체크 스크립트
+#!/bin/bash
+if ! systemctl is-active logstash > /dev/null; then
+    echo "❌ Logstash가 중단되었습니다!"
+    # 알림 발송 로직 추가
+fi
+```
+
+#### 2. 정기 점검 항목
+- [ ] ELK 스택 서비스 상태 (elasticsearch, kibana, logstash)
+- [ ] Filebeat 상태 (prod-ai, prod-backend)
+- [ ] 일일 로그 수집량 확인
+- [ ] Elasticsearch 디스크 사용량
+
+#### 3. 설정 변경 시 주의사항
+- Elasticsearch 인증 설정 변경 시 Logstash 재시작 필수
+- SSL 인증서 갱신 시 모든 Beats 재시작 필요
+- 네트워크 설정 변경 시 연결 테스트 필수
+
+### 성능 최적화
+
+#### Logstash 설정 최적화
+```yaml
+# /etc/logstash/conf.d/beats-input.conf
+output {
+  elasticsearch {
+    hosts => ["https://localhost:9200"]
+    user => "elastic"
+    password => "PASSWORD"
+    ssl_verification_mode => "none"
+    index => "%{[@metadata][index]}"
+    retry_initial_interval => 5
+    retry_max_interval => 30
+    # 성능 향상을 위한 배치 설정
+    flush_size => 500
+    idle_flush_time => 5
+  }
+}
+```
+
+---
 
 ## 최신 해결 사례 (2025-06-23)
 
