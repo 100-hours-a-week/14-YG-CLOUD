@@ -1,0 +1,5 @@
+# requirements.txt에 추가하거나 직접 설치
+elastic-apm[flask]==6.18.1  # FastAPI와 호환되는 버전
+
+# 또는 pip로 직접 설치:
+# pip install elastic-apm[flask]

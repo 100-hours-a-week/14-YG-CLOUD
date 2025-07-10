@@ -1,0 +1,41 @@
+# application.yml 또는 application.properties에 추가
+elastic:
+  apm:
+    # APM 서버 주소
+    server-url: http://elk.moongsan.com:8200
+
+    # 서비스 정보
+    service-name: moongsan-backend
+    service-version: 1.0.0
+    environment: production
+
+    # 애플리케이션 패키지 (성능 추적할 패키지)
+    application-packages: com.moongsan
+
+    # APM 활성화
+    enable: true
+
+    # 샘플링 비율 (1.0 = 100% 추적, 0.1 = 10% 추적)
+    transaction-sample-rate: 1.0
+
+    # 로그와 APM 연동
+    enable-log-correlation: true
+
+    # 성능 설정
+    stack-trace-limit: 50
+    span-frames-min-duration: 5ms
+    metrics-interval: 30s
+
+    # 데이터 캡처 설정
+    capture-body: all # 요청/응답 본문 캡처
+    capture-headers: true # HTTP 헤더 캡처
+
+    # 비활성화할 기능 (선택사항)
+    disable-instrumentations: []
+# 또는 application.properties 형식으로:
+# elastic.apm.server-url=http://elk.moongsan.com:8200
+# elastic.apm.service-name=moongsan-backend
+# elastic.apm.service-version=1.0.0
+# elastic.apm.environment=production
+# elastic.apm.application-packages=com.moongsan
+# elastic.apm.enable=true
