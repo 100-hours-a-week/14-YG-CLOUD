@@ -1,0 +1,7 @@
+elk:
+  elasticsearch:
+    protocol: "https"
+    host: "localhost"
+    port: 9200
+    username: "elastic"
+    password: "d*nevMQl9v4Cf6UhyAxW"

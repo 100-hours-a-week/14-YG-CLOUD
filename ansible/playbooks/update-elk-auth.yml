@@ -1,0 +1,19 @@
+---
+- name: Update ELK Stack Authentication
+  hosts: elk_servers
+  become: yes
+  vars_files:
+    - group_vars/shared/elk.yml
+
+  tasks:
+    - name: Update Logstash configuration
+      template:
+        src: elk-configs/logstash/beats-input.conf.j2
+        dest: /etc/logstash/conf.d/beats-input.conf
+      notify: Restart Logstash
+
+  handlers:
+    - name: Restart Logstash
+      systemd:
+        name: logstash
+        state: restarted
