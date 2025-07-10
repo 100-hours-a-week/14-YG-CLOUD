@@ -1,0 +1,74 @@
+###################### Filebeat Configuration Example #########################
+
+# ============================== Filebeat inputs ===============================
+
+filebeat.inputs:
+
+# 시스템 로그
+- type: log
+  enabled: true
+  paths:
+    - /var/log/syslog
+    - /var/log/auth.log
+    - /var/log/daemon.log
+  fields:
+    logtype: system
+    server: database
+  fields_under_root: true
+
+# MySQL/MariaDB 로그
+- type: log
+  enabled: true
+  paths:
+    - /var/log/mysql/error.log
+    - /var/log/mysql/mysql.log
+    - /var/log/mysql/slow.log
+  fields:
+    logtype: database
+    server: database
+    service: mysql
+  fields_under_root: true
+
+# Docker 컨테이너 로그
+- type: container
+  enabled: true
+  paths:
+    - /var/lib/docker/containers/*/*.log
+  fields:
+    logtype: docker
+    server: database
+  fields_under_root: true
+
+# ============================== Filebeat modules ===============================
+
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+# ================================== Outputs ===================================
+
+# Configure what output to use when sending the data collected by the beat.
+
+# ------------------------------ Logstash Output -------------------------------
+output.logstash:
+  hosts: ["10.100.0.4:5044"]
+
+# ================================= Processors =================================
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_docker_metadata: ~
+  - add_kubernetes_metadata: ~
+
+# ================================== Logging ===================================
+
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+
+# ============================= X-Pack Monitoring ==============================
+monitoring.enabled: false

@@ -243,3 +243,5 @@ ansible/host_vars/*/secrets.yml
 # 다음 명령어로 확인하세요:
 # git status --ignored
 # git add . --dry-run
+
+portfolio-*

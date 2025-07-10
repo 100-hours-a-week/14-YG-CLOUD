@@ -1,0 +1,68 @@
+input {
+  beats {
+    port => 5044
+  }
+}
+
+filter {
+  # 공통 필터
+  mutate {
+    add_field => { "[@metadata][index]" => "moongsan-logs-%{+YYYY.MM.dd}" }
+  }
+  
+  # Docker 로그 파싱
+  if [container][name] {
+    mutate {
+      add_field => { "service" => "%{[container][name]}" }
+    }
+  }
+  
+  # 시스템 로그 파싱
+  if [log][file][path] =~ "/var/log/" {
+    mutate {
+      add_field => { "log_type" => "system" }
+    }
+  }
+  
+  # 애플리케이션 로그 파싱
+  if [log][file][path] =~ "/var/moongsan/log/" {
+    mutate {
+      add_field => { "log_type" => "application" }
+    }
+  }
+  
+  # AI 서비스 로그 특별 처리
+  if [log][file][path] =~ "ai_moongsan.log" {
+    grok {
+      match => { "message" => "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:msg}" }
+    }
+    mutate {
+      add_field => { "service" => "ai-service" }
+    }
+  }
+  
+  # Backend 로그 처리
+  if [log][file][path] =~ "be_moongsan.log" {
+    grok {
+      match => { "message" => "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:msg}" }
+    }
+    mutate {
+      add_field => { "service" => "backend-service" }
+    }
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["{{ elk.elasticsearch.protocol }}://{{ elk.elasticsearch.host }}:{{ elk.elasticsearch.port }}"]
+    user => "{{ elk.elasticsearch.username }}"
+    password => "{{ elk.elasticsearch.password }}"
+    ssl_verification_mode => "none"
+    index => "%{[@metadata][index]}"
+    retry_initial_interval => 5
+    retry_max_interval     => 30
+  }
+  
+  # 디버깅용 (필요시 주석 해제)
+  # stdout { codec => rubydebug }
+}
