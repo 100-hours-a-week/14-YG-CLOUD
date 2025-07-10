@@ -1,0 +1,11 @@
+---
+# AI Deploy Role 기본 변수
+
+# APM 설정
+ai:
+  apm:
+    service_name: "ai-moongsan"
+    server_url: "http://34.47.84.135:8200"
+    environment: "production"
+    capture_body: "errors"
+    capture_headers: "true"

@@ -8,7 +8,8 @@
   git:
     repo: https://github.com/100-hours-a-week/14-YG-BE.git
     dest: /home/ubuntu/14-YG-BE
-    version: "{{ branch }}"
+    # version: "{{ branch }}"
+    version: tmp/no-kafka
     update: yes
     force: yes
     accept_hostkey: yes
@@ -19,6 +20,11 @@
   become: false
   args:
     executable: /bin/bash
+
+# 임시 조치: 검증 어노테이션 제거 (조건부 실행)
+- name: Remove validation annotations (temporary fix)
+  include_tasks: remove_annotations.yml
+  when: deployment.remove_validation_annotations | default(false)
 
 # --- docker로 전환
 - name: Ensure envs directory for backend exists

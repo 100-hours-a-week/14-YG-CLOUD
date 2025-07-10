@@ -27,26 +27,14 @@ RUN apt-get update && \
 
 RUN rm -f /usr/local/bin/chromedriver
 
-# 4) Chrome 137+ 버전에 맞는 ChromeDriver 다운로드 (새로운 API 사용)
-RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}') && \
-    echo "Chrome version: $CHROME_VERSION" && \
-    if [[ "$CHROME_VERSION" > "114" ]]; then \
-        wget -O /tmp/chromedriver.zip \
-             "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chromedriver-linux64.zip" && \
-        cd /tmp && \
-        unzip chromedriver.zip && \
-        mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver && \
-        rm -rf chromedriver*; \
-    else \
-        CHROME_MAJOR=${CHROME_VERSION%%.*} && \
-        DRIVER_VERSION=$(curl -fsS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR}" \
-                         || curl -fsS https://chromedriver.storage.googleapis.com/LATEST_RELEASE) && \
-        wget -O /tmp/chromedriver.zip \
-             "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip" && \
-        unzip /tmp/chromedriver.zip -d /usr/local/bin && \
-        rm /tmp/chromedriver.zip; \
-    fi && \
-    chmod +x /usr/local/bin/chromedriver && \
+# 4) **Chrome 버전에 “정확히” 맞는 ChromeDriver 다운 (실패 시 빌드 중단)**
+RUN set -e ; \
+    CHROME_VERSION=$(google-chrome --version | awk '{print $3}') ; \
+    wget -q -O /tmp/chromedriver.zip \
+      "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chromedriver-linux64.zip" ; \
+    unzip -q -j /tmp/chromedriver.zip chromedriver-linux64/chromedriver -d /usr/local/bin ; \
+    chmod +x /usr/local/bin/chromedriver ; \
+    rm /tmp/chromedriver.zip ; \
     chromedriver --version
 
 # 5) Python 바이너리 복사

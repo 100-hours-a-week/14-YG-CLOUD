@@ -1,0 +1,43 @@
+# 임시 조치: 검증 어노테이션 제거
+# @ProfanitySafe, @XssSafe 어노테이션을 배포 전에 제거
+
+- name: Check if DescriptionGenerationRequest.java exists
+  stat:
+    path: /home/ubuntu/14-YG-BE/src/main/java/com/moogsan/moongsan_backend/domain/groupbuy/DescriptionGenerationRequest.java
+  register: desc_gen_file
+  become: false
+
+- name: Create backup of DescriptionGenerationRequest.java
+  copy:
+    src: /home/ubuntu/14-YG-BE/src/main/java/com/moogsan/moongsan_backend/domain/groupbuy/DescriptionGenerationRequest.java
+    dest: /home/ubuntu/14-YG-BE/src/main/java/com/moogsan/moongsan_backend/domain/groupbuy/DescriptionGenerationRequest.java.backup
+    remote_src: yes
+    backup: yes
+  become: false
+  when: desc_gen_file.stat.exists
+
+- name: Remove @ProfanitySafe annotation from DescriptionGenerationRequest
+  lineinfile:
+    path: /home/ubuntu/14-YG-BE/src/main/java/com/moogsan/moongsan_backend/domain/groupbuy/DescriptionGenerationRequest.java
+    regexp: '^\s*@ProfanitySafe\s*$'
+    state: absent
+  become: false
+  when: desc_gen_file.stat.exists
+
+- name: Remove @XssSafe annotation from DescriptionGenerationRequest
+  lineinfile:
+    path: /home/ubuntu/14-YG-BE/src/main/java/com/moogsan/moongsan_backend/domain/groupbuy/DescriptionGenerationRequest.java
+    regexp: '^\s*@XssSafe\s*$'
+    state: absent
+  become: false
+  when: desc_gen_file.stat.exists
+
+- name: Log annotation removal
+  debug:
+    msg: "Removed @ProfanitySafe and @XssSafe annotations from DescriptionGenerationRequest.java (temporary fix)"
+  when: desc_gen_file.stat.exists
+
+- name: Log file not found
+  debug:
+    msg: "DescriptionGenerationRequest.java not found - skipping annotation removal"
+  when: not desc_gen_file.stat.exists

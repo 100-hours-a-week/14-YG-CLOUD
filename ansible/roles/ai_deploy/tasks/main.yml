@@ -40,6 +40,14 @@
     - {regexp: "^torchvision$", line: "torchvision>=0.15.2,<0.16.0"}
     - {regexp: "^numpy$", line: "numpy<2"}
     - {regexp: "^opencv-python-headless$", line: "opencv-python-headless==4.9.0.80"}
+    - {regexp: "^elastic-apm", line: "elastic-apm[flask]>=6.15.0"}
+
+- name: Copy APM-enabled main.py to AI repo
+  template:
+    src: main.py.j2
+    dest: "{{ project_paths.ai_repo }}/v1/app/main.py"
+    mode: "0644"
+  become: true
 
 - name: Copy Dockerfile to AI repo
   template:
