@@ -1,0 +1,20 @@
+---
+- name: Update APM Server Authentication
+  hosts: elk_servers
+  become: yes
+
+  tasks:
+    - name: Update APM Server configuration
+      template:
+        src: ../roles/apm_server/templates/apm-server.yml.j2
+        dest: /etc/apm-server/apm-server.yml
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart APM Server
+
+  handlers:
+    - name: Restart APM Server
+      systemd:
+        name: apm-server
+        state: restarted

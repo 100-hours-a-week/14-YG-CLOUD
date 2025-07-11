@@ -17,7 +17,7 @@ apm-server:
 output.elasticsearch:
   hosts: ["https://localhost:9200"]
   username: "elastic"
-  password: "{{ elk_password }}"
+  password: "{{ elk.elasticsearch.password }}"
   ssl.verification_mode: none
 
 logging.level: info

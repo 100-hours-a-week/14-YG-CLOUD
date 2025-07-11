@@ -105,6 +105,10 @@
 
 ## [미출시]
 
+### 수정
+- **APM 서버 인증 오류 해결**: Elasticsearch 비밀번호 변경 후 APM 서버가 데이터를 전송하지 못하는 문제를 해결. `update-apm-auth.yml` 플레이북을 통해 인증 정보 업데이트를 자동화.
+- **Ansible 인벤토리 구조 개선**: `shared.ini` 파일에 `[elk_servers:children]` 그룹을 추가하여 변수 상속 구조를 명확히 함.
+
 ### 추가 (2025-06-23)
 - **Production Infrastructure**: prod 환경 NAT Gateway 및 네트워크 라우팅 완전 구성
 - **Database Operations**: 운영 DB 덤프 자동 임포트 시스템 (simple_db_fix.yml)

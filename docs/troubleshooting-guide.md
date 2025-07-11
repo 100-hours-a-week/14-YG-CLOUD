@@ -628,6 +628,24 @@ ansible-vault create group_vars/all/vault.yml
 
 ---
 
+### 🚨 APM 서버 인증 문제
+
+**증상**:
+- Kibana APM UI에 새로운 데이터가 들어오지 않음.
+- APM 서버 로그(`journalctl -u apm-server`)에 `401 Unauthorized` 또는 `bulk indexing request failed` 오류 발생.
+
+**원인**:
+- Elasticsearch 비밀번호 변경 후, APM 서버 설정(`apm-server.yml`)이 업데이트되지 않아 인증에 실패함.
+
+**해결**:
+1.  `ansible/group_vars/shared/elk.yml` 파일에 올바른 Elasticsearch 비밀번호가 설정되어 있는지 확인합니다.
+2.  아래 Ansible 플레이북을 실행하여 APM 서버 설정을 업데이트하고 재시작합니다.
+    ```bash
+    ansible-playbook -i shared.ini playbooks/update-apm-auth.yml
+    ```
+
+---
+
 ## 로그 수집 문제해결
 
 ## 🚨 로그 수집 중단 문제 (2025-07-10 완전 해결)
