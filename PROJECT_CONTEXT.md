@@ -3,9 +3,9 @@
 > **목적**: AI 어시스턴트가 프로젝트 상황을 빠르게 파악할 수 있도록 핵심 정보를 정리한 문서
 
 ## 📅 최종 업데이트
-- **날짜**: 2024년 7월 14일
+- **날짜**: 2025년 7월 14일
 - **브랜치**: `feat/3tier`
-- **상태**: Jenkins AWS 마이그레이션 진행 중
+- **상태**: Jenkins 플러그인 설치 완료, CI/CD 파이프라인 구성 준비
 
 ## 🌟 프로젝트 개요
 
@@ -35,22 +35,54 @@
 - [x] GCP 3tier 아키텍처 구성 (Terraform)
 - [x] Ansible 배포 자동화 구성
 - [x] 기본 인프라 문서화
+- [x] **Jenkins AWS 마이그레이션 완료** (2024-07-14)
+  - Jenkins 서버 AWS EC2에 설치 완료
+  - 도메인 설정: jenkins.moongsan.com:8080
+  - 필수 플러그인 설치 완료 (Docker, Pipeline, Git, Ansible 등)
+  - 플러그인 설치 권한 문제 해결 (CLI → 직접 다운로드 방식)
 
 ### 🔄 진행 중인 작업
-- [ ] **Shared 환경 AWS 마이그레이션** (최우선)
-  - **배경**: GCP vCPU 할당량 문제
-  - **대상**: shared VPC의 모든 리소스 (Jenkins 포함)
-  - **상태**: Jenkins 우선 이전 → 전체 shared 환경 이전
+- [ ] **Jenkins CI/CD 파이프라인 구성** (최우선)
+  - **배경**: Jenkins 서버 설치 완료, 파이프라인 생성 필요
+  - **대상**: Backend 서비스 GCP dev 환경 배포 파이프라인
+  - **상태**: Jenkinsfile 작성 및 첫 파이프라인 생성 예정
+- [ ] **Shared 환경 나머지 AWS 마이그레이션** (진행 중)
+  - **배경**: Jenkins 이전 완료, 나머지 리소스 이전 필요
+  - **대상**: shared VPC의 기타 리소스들
+  - **상태**: Jenkins 완료 → 기타 리소스 순차 이전
 - [ ] **Prod 환경 AWS 마이그레이션** (후속)
   - **대상**: 운영 환경 전체
   - **전략**: Shared 환경 이전 완료 후 진행
 
 ### ⏳ 예정 작업
-- [ ] Jenkins CI/CD 파이프라인 구성
+- [ ] **Cross-cloud 네트워킹 구성**
+  - AWS Jenkins ↔ GCP dev 환경 연결 설정
+  - VPC 피어링 또는 VPN 터널 구성
 - [ ] 기존 Ansible 역할 통합 (`ai_deploy`, `be_deploy`, `fe_deploy`)
 - [ ] Shared 환경 전체 AWS 이전 완료
 - [ ] Prod 환경 AWS 마이그레이션 계획 수립
 - [ ] 포트폴리오 문서 통합 작성
+
+## 🎯 중요한 해결된 문제
+
+### Jenkins 플러그인 설치 권한 문제 (2024-07-14)
+**문제**: Jenkins CLI를 통한 플러그인 설치 시 `ERROR: anonymous is missing the Overall/Read permission` 오류
+
+**해결 과정**:
+1. **문제 분석**: Jenkins 보안 활성화 상태에서 CLI anonymous 접근 권한 부족
+2. **대안 검토**: 
+   - 웹 UI 수동 설치 (간단하지만 자동화 불가)
+   - API 토큰 설정 (복잡한 초기 설정)
+   - 보안 일시 비활성화 (보안 위험)
+   - **플러그인 파일 직접 다운로드** (선택됨)
+3. **선택 이유**: 자동화 유지 + 보안 유지 + 신뢰성
+4. **구현**: Ansible로 Jenkins 공식 업데이트 서버에서 .hpi 파일 직접 다운로드
+5. **결과**: 11개 플러그인 모두 설치 완료, Jenkins 재시작으로 활성화
+
+**교훈**: 
+- CLI 권한 문제 시 파일 시스템 레벨 접근 방식 고려
+- 보안과 자동화의 균형점 찾기
+- 공식 소스 활용으로 안정성 확보
 
 ## 🚀 CI/CD 전략
 
@@ -67,7 +99,9 @@
 - **배포**: 수동 트리거 (안정성 확보)
 
 ### Jenkins 위치
-- **현재**: AWS로 마이그레이션 중 (Shared 환경의 일부)
+- **현재**: AWS EC2에 설치 완료 (jenkins.moongsan.com:8080)
+- **플러그인**: Docker, Pipeline, Git, Ansible 등 필수 플러그인 설치 완료
+- **상태**: 파이프라인 생성 준비 완료
 - **역할**: 모든 환경의 CI/CD 허브
 - **사용 도구**: 기존 Ansible 역할 활용
 - **최종 구성**: AWS 기반 Shared 환경에서 dev(GCP) + prod(AWS) 관리

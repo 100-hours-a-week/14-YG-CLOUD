@@ -6,6 +6,7 @@
 
 - [Terraform 문제해결](#terraform-문제해결)
 - [Ansible 문제해결](#ansible-문제해결)
+- [Jenkins 문제해결](#jenkins-문제해결)
 - [WireGuard VPN 문제해결](#wireguard-vpn-문제해결)
 - [GCP 리소스 문제해결](#gcp-리소스-문제해결)
 - [네트워크 연결 문제해결](#네트워크-연결-문제해결)
@@ -194,6 +195,139 @@ sudo docker run -d --name test-backend -p 8080:8080 backend-image
 
 # 4. 포트 충돌 확인
 sudo netstat -tlnp | grep 8080
+```
+
+---
+
+## Jenkins 문제해결
+
+### 🔧 플러그인 설치 문제
+
+#### **문제**: Jenkins CLI 플러그인 설치 시 권한 오류
+```bash
+ERROR: anonymous is missing the Overall/Read permission
+```
+
+**증상**:
+- Ansible로 Jenkins CLI를 통한 플러그인 설치 실패
+- `java -jar jenkins-cli.jar install-plugin` 명령어 권한 부족
+- Jenkins가 보안 활성화 상태에서 anonymous 사용자 권한 없음
+
+**원인 분석**:
+1. **보안 설정**: Jenkins가 초기 설정 완료 후 보안이 활성화된 상태
+2. **권한 부족**: CLI 도구가 anonymous 사용자로 실행되어 플러그인 관리 권한 없음
+3. **인증 미설정**: API 토큰이나 사용자 인증 정보 없이 CLI 접근 시도
+
+**해결방법 비교**:
+
+| 방법 | 장점 | 단점 | 권장도 |
+|------|------|------|--------|
+| **웹 UI 수동 설치** | 간단, 안전, 확실 | 자동화 불가 | ⭐⭐⭐ |
+| **플러그인 파일 직접 다운로드** | 자동화 가능, 권한 문제 없음 | 의존성 관리 복잡 | ⭐⭐⭐⭐⭐ |
+| **API 토큰 사용** | 완전 자동화 | 초기 설정 복잡 | ⭐⭐⭐⭐ |
+| **보안 일시 비활성화** | CLI 사용 가능 | 보안 위험 | ⭐ |
+
+**선택된 해결방법**: **플러그인 파일 직접 다운로드 방식**
+
+**이유**:
+1. **자동화 유지**: Ansible 스크립트로 완전 자동화 가능
+2. **보안 유지**: Jenkins 보안 설정을 변경하지 않음  
+3. **신뢰성**: Jenkins 공식 업데이트 서버에서 직접 다운로드
+4. **간편성**: 추가 인증 설정 불필요
+
+**구현된 해결책**:
+```yaml
+# ansible/roles/jenkins/tasks/main.yml
+- name: Create Jenkins plugins directory
+  ansible.builtin.file:
+    path: /var/lib/jenkins/plugins
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: '0755'
+
+- name: Define required plugins with download URLs
+  ansible.builtin.set_fact:
+    jenkins_plugins:
+      - name: docker-workflow
+        url: "https://updates.jenkins.io/latest/docker-workflow.hpi"
+      - name: pipeline-stage-view
+        url: "https://updates.jenkins.io/latest/pipeline-stage-view.hpi"
+      # ... 기타 플러그인들
+
+- name: Check if plugins are already installed
+  ansible.builtin.stat:
+    path: "/var/lib/jenkins/plugins/{{ item.name }}.jpi"
+  register: plugin_check
+  with_items: "{{ jenkins_plugins }}"
+
+- name: Download and install Jenkins plugins
+  ansible.builtin.get_url:
+    url: "{{ item.item.url }}"
+    dest: "/var/lib/jenkins/plugins/{{ item.item.name }}.jpi"
+    owner: jenkins
+    group: jenkins
+    mode: '0644'
+  with_items: "{{ plugin_check.results }}"
+  when: not item.stat.exists
+  notify: restart jenkins
+```
+
+**성공 결과**:
+- ✅ 3개 신규 플러그인 자동 설치 (docker-workflow, pipeline-stage-view, ansible)
+- ✅ 8개 기존 플러그인 상태 확인
+- ✅ Jenkins 자동 재시작으로 플러그인 활성화
+- ✅ 보안 설정 유지
+
+**예방책**:
+1. **플러그인 리스트 버전 관리**: 필요한 플러그인을 변수로 정의하여 관리
+2. **의존성 확인**: 주요 플러그인의 의존성 사전 확인
+3. **백업 전략**: 플러그인 설치 전 Jenkins 설정 백업
+4. **테스트 환경**: 중요한 플러그인 변경 시 테스트 환경 먼저 적용
+
+#### **문제**: 플러그인 의존성 오류
+```bash
+Plugin installation failed due to missing dependencies
+```
+
+**해결방법**:
+```bash
+# 1. 웹 UI에서 의존성과 함께 설치
+# Manage Jenkins > Plugins > Available Plugins에서 "Install with dependencies" 선택
+
+# 2. 수동으로 의존성 플러그인 먼저 설치
+jenkins_plugins:
+  - workflow-step-api      # 의존성
+  - workflow-aggregator    # 메인 플러그인
+
+# 3. Jenkins 플러그인 매니저 로그 확인
+sudo tail -f /var/log/jenkins/jenkins.log
+```
+
+### 🌐 접속 문제
+
+#### **문제**: Jenkins 웹 UI 접속 불가
+```bash
+This site can't be reached - jenkins.moongsan.com refused to connect
+```
+
+**해결방법**:
+```bash
+# 1. Jenkins 서비스 상태 확인
+sudo systemctl status jenkins
+
+# 2. 포트 8080 리스닝 확인
+sudo netstat -tlnp | grep 8080
+
+# 3. 방화벽 설정 확인
+sudo ufw status
+sudo ufw allow 8080
+
+# 4. DNS 설정 확인 (도메인 사용 시)
+nslookup jenkins.moongsan.com
+
+# 5. 직접 IP 접속 테스트
+curl -I http://3.38.150.190:8080
 ```
 
 ---
