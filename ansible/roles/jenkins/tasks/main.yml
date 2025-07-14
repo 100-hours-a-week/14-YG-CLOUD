@@ -32,7 +32,53 @@
   ansible.builtin.shell: cat /var/lib/jenkins/secrets/initialAdminPassword
   register: jenkins_initial_password
   changed_when: false
+  failed_when: false
+
+- name: Check if Jenkins setup is needed
+  ansible.builtin.set_fact:
+    jenkins_needs_setup: "{{ jenkins_initial_password.rc == 0 }}"
 
 - name: Display Jenkins initial admin password
   ansible.builtin.debug:
     msg: "Jenkins initial admin password: {{ jenkins_initial_password.stdout }}"
+  when: jenkins_needs_setup
+
+- name: Wait for Jenkins to be fully started
+  ansible.builtin.uri:
+    url: "http://localhost:8080/login"
+    method: GET
+    status_code: [200, 403]
+  register: jenkins_service_status
+  until: jenkins_service_status.status in [200, 403]
+  retries: 10
+  delay: 30
+
+- name: Check if Jenkins is already configured
+  ansible.builtin.uri:
+    url: "http://localhost:8080/manage"
+    method: GET
+    status_code: [200, 403]
+  register: jenkins_config_check
+  failed_when: false
+
+- name: Display Jenkins current status
+  ansible.builtin.debug:
+    msg:
+      - "🔍 Jenkins Status Check:"
+      - "  Service Status: {{ jenkins_service_status.status }}"
+      - "  Configuration needed: {{ jenkins_needs_setup }}"
+      - "  Initial password available: {{ jenkins_initial_password.rc == 0 }}"
+
+- name: Jenkins setup completion message (already configured)
+  ansible.builtin.debug:
+    msg:
+      - "ℹ️ Jenkins is already running and configured!"
+      - "📍 Jenkins URL: http://{{ ansible_host }}:8080"
+      - "� Jenkins Version: Detected from headers"
+      - ""
+      - "📋 Next steps:"
+      - "  1. Access Jenkins web UI to verify configuration"
+      - "  2. Check installed plugins in Manage Jenkins > Plugins"
+      - "  3. Configure credentials if needed"
+      - "  4. Create your first pipeline job"
+  when: not jenkins_needs_setup
