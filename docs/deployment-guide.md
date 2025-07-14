@@ -309,4 +309,82 @@ ping 10.0.1.4  # Database 서버 내부 IP
 
 ---
 
+## 🚀 Jenkins CI/CD 설정 가이드
+
+> **목표**: AWS로 마이그레이션된 Jenkins를 활용하여 `dev` 환경의 지속적 배포(CD)와 `prod` 환경의 지속적 통합(CI)을 자동화합니다.
+
+### 📋 CI/CD 파이프라인 전략
+
+- **`dev` 환경**: GitHub `develop` 브랜치에 Push가 발생하면, 자동으로 빌드, 테스트, Docker 이미지 생성 및 `dev` 서버 배포까지 수행합니다. (CI + CD)
+- **`prod` 환경**: GitHub `main` 브랜치에 Push가 발생하면, 빌드 및 테스트까지만 자동으로 수행합니다. 프로덕션 배포는 안정성을 위해 수동으로 트리거합니다. (CI only)
+- **Pipeline as Code**: 모든 파이프라인은 `Jenkinsfile`로 코드를 통해 관리하여 버전 관리와 재사용성을 높입니다.
+
+### 1단계: Jenkins Credential 설정
+
+CI/CD 파이프라인이 외부 서비스와 안전하게 통신하기 위해 다음 Credential을 Jenkins에 등록했습니다.
+
+1.  **GitHub Personal Access Token (PAT)**
+    - **Kind**: `Username with password`
+    - **ID**: `github-pat-credentials`
+    - **용도**: Jenkins가 GitHub 저장소에서 소스 코드를 가져오고, Webhook을 관리하기 위해 사용합니다.
+    - **설정 방법**:
+        1. GitHub > Developer settings > Personal access tokens (classic)에서 `repo`, `admin:repo_hook` 권한을 가진 토큰을 생성합니다.
+        2. Jenkins > Manage Jenkins > Credentials > (global)에서 위 정보를 사용하여 새로운 Credential을 추가합니다.
+
+2.  **Docker Hub Credential**
+    - **Kind**: `Username with password`
+    - **ID**: `dockerhub-credentials`
+    - **용도**: 빌드된 애플리케이션 Docker 이미지를 Docker Hub 저장소에 Push하기 위해 사용합니다.
+    - **설정 방법**:
+        1. Jenkins > Manage Jenkins > Credentials > (global)에서 Docker Hub 계정 정보를 사용하여 새로운 Credential을 추가합니다.
+
+### 2단계: 파이프라인 생성 (예정)
+
+각 서비스(BE, FE, AI)의 소스 코드 저장소에 `Jenkinsfile`을 추가하여 파이프라인을 정의할 예정입니다.
+
+**`dev` 환경 백엔드 `Jenkinsfile` 예시 (구상):**
+
+```groovy
+pipeline {
+    agent any
+
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
+        // 추가 환경 변수 정의
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'develop', credentialsId: 'github-pat-credentials', url: 'https://github.com/your-org/your-repo.git'
+            }
+        }
+        stage('Build') {
+            steps {
+                echo 'Building the application...'
+                // 예: sh './gradlew build'
+            }
+        }
+        stage('Build & Push Docker Image') {
+            steps {
+                script {
+                    def imageName = "your-dockerhub-id/your-image-name:dev-${BUILD_NUMBER}"
+                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
+                        def customImage = docker.build(imageName, '.')
+                        customImage.push()
+                    }
+                }
+            }
+        }
+        stage('Deploy to Dev') {
+            steps {
+                echo 'Deploying to development environment...'
+                // Ansible Playbook 실행 로직 추가 예정
+                // 예: sh 'ansible-playbook -i ansible/dev.ini ansible/playbooks/deploy_be.yml'
+            }
+        }
+    }
+}
+```
+
 > 💡 **팁**: 이 가이드를 북마크하고 각 단계를 차근차근 따라하세요. 스크립트에 의존하지 않고 직접 명령어를 실행함으로써 인프라에 대한 깊은 이해를 얻을 수 있습니다.
