@@ -17,13 +17,23 @@
 - **완료된 작업**:
     - [x] Terraform을 사용한 AWS 공유 VPC 및 Jenkins EC2 인프라 프로비저닝
     - [x] Ansible을 사용한 Jenkins 서버 초기 설치 및 설정
-    - [x] Jenkins Credential 등록 (GitHub PAT, Docker Hub)
+    - [x] Jenkins 서버 연결 확인 및 SSH 키 구성 완료
+    - [x] Jenkins Credential 등록 완료:
+        - [x] GitHub Personal Access Token (PAT) - ID: `github-pat-credentials`
+        - [x] Docker Hub Credential - ID: `dockerhub-credentials`
     - [x] `deployment-guide.md`에 Jenkins 설정 내용 문서화
 - **남은 작업**:
+    - [ ] **Jenkins 플러그인 설치**: Docker, Ansible, Git 관련 플러그인 설치
     - [ ] **WireGuard 터널링 설정**: AWS Jenkins 서버와 GCP `dev` 환경 간의 WireGuard 연결 구성
     - [ ] 각 서비스(BE, FE, AI)별 `Jenkinsfile` 작성하여 파이프라인 코드화
     - [ ] `dev` 환경(develop 브랜치): Build → Test → Push → Deploy 자동화 (GCP `dev` 환경 대상)
     - [ ] `prod` 환경(main 브랜치): Build → Test 까지만 자동화 (배포는 수동 승인)
+
+### Phase 1 완료 기준
+- **Jenkins 서비스 상태**: ✅ 실행 중 (AWS EC2: 3.38.150.190)
+- **Ansible 연결**: ✅ 정상 (SSH 키 구성 완료)
+- **Credentials 설정**: ✅ 완료 (GitHub PAT + Docker Hub)
+- **다음 단계**: Jenkins 플러그인 설치 및 파이프라인 구성
 
 ### Phase 2: 프로덕션(`prod`) 환경 인프라 AWS 이전
 
@@ -56,6 +66,34 @@
     - [ ] 최소 1-2주간 AWS `prod` 환경 모니터링 후 롤백 계획이 불필요하다고 판단
     - [ ] Terraform `destroy` 명령을 사용하여 `prod` 환경의 GCP 리소스 제거
     - [ ] (선택 사항) GCP `dev` 환경의 리소스는 무료 크레딧 범위 내에서 유지 관리
+
+---
+
+## 현재 진행 상황 (2024년 7월 14일 기준)
+
+### ✅ 완료된 인프라 현황
+
+| 환경 | 플랫폼 | 상태 | 주요 서비스 | 연결 테스트 |
+|------|--------|------|-------------|-------------|
+| **Dev** | GCP | 🟢 운영 중 | moongsan-dev-vm (34.64.59.25) | ✅ 정상 |
+| **Prod** | GCP | 🟢 운영 중 | backend, ai, database (내부 IP) | ✅ 정상 |
+| **Shared** | GCP | 🟢 운영 중 | jumpbox, elk 서버 | ✅ 정상 |
+| **Jenkins** | AWS | 🟢 운영 중 | aws-shared-jenkins (3.38.150.190) | ✅ 정상 |
+
+### 🔧 Jenkins 설정 현황
+
+- **서버 위치**: AWS EC2 (3.38.150.190)
+- **서비스 상태**: 실행 중
+- **Ansible 연결**: SSH 키 구성 완료
+- **Credentials 구성**:
+  - `github-pat-credentials`: GitHub 저장소 접근용
+  - `dockerhub-credentials`: Docker 이미지 push용
+
+### 🎯 다음 우선 작업
+
+1. **Jenkins 플러그인 설치** (Docker, Ansible, Git)
+2. **첫 번째 파이프라인 구성** (Backend 서비스 우선)
+3. **Cross-cloud 네트워킹 설정** (AWS ↔ GCP 연결)
 
 ---
 > 이 문서는 멀티 클라우드 전략에 따라 지속적으로 업데이트되어야 합니다.
