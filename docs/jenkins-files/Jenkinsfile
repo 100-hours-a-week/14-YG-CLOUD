@@ -1,0 +1,149 @@
+pipeline {
+    agent any
+    
+    environment {
+        // Docker 설정
+        DOCKER_IMAGE = 'moongsan/backend'
+        DOCKER_TAG = "${BUILD_NUMBER}"
+        
+        // 배포 대상 (GCP dev 환경)
+        TARGET_ENV = 'dev'
+        GCP_PROJECT = 'ktb-2-moongsan'
+        GCP_ZONE = 'asia-northeast3-a'
+        TARGET_INSTANCE = 'moongsan-dev-vm'
+        
+        // Credentials IDs (Jenkins에서 설정할 것들)
+        DOCKERHUB_CREDENTIALS = 'dockerhub-credentials'
+        GCP_SSH_KEY = 'gcp-ssh-key'
+        
+        // 앱 설정
+        APP_PORT = '8080'
+        HEALTH_CHECK_URL = 'http://localhost:8080/health'
+    }
+    
+    triggers {
+        // tmp/no-kafka 브랜치에 push 시 자동 트리거
+        githubPush()
+    }
+    
+    stages {
+        stage('🚀 Setup') {
+            steps {
+                echo "=== Backend CI/CD Pipeline 시작 ==="
+                echo "빌드 번호: ${BUILD_NUMBER}"
+                echo "대상 환경: ${TARGET_ENV}"
+                echo "Docker 이미지: ${DOCKER_IMAGE}:${DOCKER_TAG}"
+                
+                sh '''
+                    echo "현재 브랜치: $(git branch --show-current)"
+                    echo "마지막 커밋: $(git log -1 --oneline)"
+                    echo "워킹 디렉토리: $(pwd)"
+                    ls -la
+                '''
+            }
+        }
+        
+        stage('🔨 Build & Test') {
+            steps {
+                echo "=== Maven 빌드 및 테스트 ==="
+                
+                sh 'chmod +x ./mvnw'
+                
+                sh '''
+                    ./mvnw clean test -Dspring.profiles.active=test
+                '''
+                
+                publishTestResults testResultsPattern: 'target/surefire-reports/*.xml'
+                
+                sh '''
+                    ./mvnw clean package -DskipTests=true -Dspring.profiles.active=prod
+                    ls -la target/
+                '''
+            }
+        }
+        
+        stage('🐳 Docker Build & Push') {
+            steps {
+                echo "=== Docker 이미지 빌드 및 푸시 ==="
+                
+                script {
+                    def dockerImage = docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
+                    
+                    sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest"
+                    
+                    docker.withRegistry('https://registry.hub.docker.com', DOCKERHUB_CREDENTIALS) {
+                        dockerImage.push()
+                        dockerImage.push('latest')
+                    }
+                    
+                    echo "✅ Docker 이미지 푸시 완료: ${DOCKER_IMAGE}:${DOCKER_TAG}"
+                }
+            }
+        }
+        
+        stage('🚀 Deploy to GCP Dev') {
+            steps {
+                echo "=== GCP dev 환경 배포 ==="
+                
+                script {
+                    sh '''
+                        cd /var/jenkins_home/workspace
+                        
+                        if [ ! -d "14-YG-CLOUD" ]; then
+                            git clone https://github.com/100-hours-a-week/14-YG-CLOUD.git
+                        fi
+                        
+                        cd 14-YG-CLOUD
+                        git pull origin feat/3tier
+                        
+                        ansible-playbook -i ansible/dev.ini \
+                            ansible/playbooks/jenkins_be_deploy.yml \
+                            -e docker_image_tag=${DOCKER_TAG} \
+                            -e target_env=${TARGET_ENV} \
+                            --tags backend
+                    '''
+                }
+            }
+        }
+        
+        stage('🔍 Health Check') {
+            steps {
+                echo "=== 배포 완료 후 Health Check ==="
+                
+                script {
+                    sleep(time: 30, unit: 'SECONDS')
+                    
+                    sh '''
+                        gcloud compute ssh ${TARGET_INSTANCE} \
+                            --zone=${GCP_ZONE} \
+                            --project=${GCP_PROJECT} \
+                            --command="curl -f ${HEALTH_CHECK_URL} || exit 1"
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo "=== Pipeline 완료 ==="
+            cleanWs()
+        }
+        
+        success {
+            echo "✅ Backend 배포 성공!"
+            echo "🎉 새로운 버전이 GCP dev 환경에 배포되었습니다."
+            echo "🔗 배포된 버전: ${DOCKER_IMAGE}:${DOCKER_TAG}"
+        }
+        
+        failure {
+            echo "❌ Backend 배포 실패!"
+            echo "🔍 로그를 확인하여 문제를 해결해주세요: ${BUILD_URL}"
+        }
+        
+        unstable {
+            echo "⚠️ Backend 배포가 불안정합니다!"
+            echo "🔍 테스트 결과를 확인해주세요: ${BUILD_URL}"
+        }
+    }
+}

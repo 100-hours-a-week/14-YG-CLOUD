@@ -1,0 +1,148 @@
+# Jenkins CI/CD용 Backend 배포 플레이북
+# 용도: Jenkins 파이프라인에서 Backend 서비스만 배포
+# 
+# 사용법:
+#   ansible-playbook -i dev.ini playbooks/jenkins_be_deploy.yml \
+#     -e docker_image_tag=123 \
+#     -e target_env=dev \
+#     --tags backend
+
+- name: "🚀 Jenkins Backend 배포 시작"
+  hosts: localhost
+  connection: local
+  gather_facts: yes
+  vars:
+    deployment_env: "{{ target_env | default('dev') }}"
+    docker_tag: "{{ docker_image_tag | default('latest') }}"
+  tasks:
+    - name: Jenkins 배포 정보 표시
+      debug:
+        msg:
+          - "🎯 배포 환경: {{ deployment_env | upper }}"
+          - "🐳 Docker 태그: {{ docker_tag }}"
+          - "📅 배포 시간: {{ ansible_date_time.iso8601 }}"
+          - "🖥️  대상 호스트: {{ groups[deployment_env] if deployment_env in groups else 'N/A' }}"
+
+# Backend 서비스 배포
+- name: "🏗️ Backend 서비스 배포"
+  hosts: "{{ target_env | default('dev') }}"
+  become: true
+  gather_facts: yes
+  tags: ["backend"]
+  vars:
+    docker_tag: "{{ docker_image_tag | default('latest') }}"
+    deployment_env: "{{ target_env | default('dev') }}"
+  
+  tasks:
+    - name: Backend 배포 시작 알림
+      debug:
+        msg:
+          - "🚀 Backend 배포를 시작합니다"
+          - "🐳 이미지: moongsan/backend:{{ docker_tag }}"
+          - "🎯 환경: {{ deployment_env }}"
+    
+    # Docker 기본 설정
+    - name: Docker 서비스 상태 확인
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Docker 그룹에 사용자 추가
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+
+    # 기존 컨테이너 정리
+    - name: 기존 backend 컨테이너 중지 및 제거
+      docker_container:
+        name: backend
+        state: absent
+        force_kill: yes
+      ignore_errors: yes
+
+    # Docker 네트워크 생성
+    - name: moongsan-net 네트워크 생성
+      docker_network:
+        name: moongsan-net
+        state: present
+
+    # 새 이미지 Pull
+    - name: Backend 이미지 Pull
+      docker_image:
+        name: "moongsan/backend:{{ docker_tag }}"
+        source: pull
+        force_source: yes
+
+    # Backend 컨테이너 실행
+    - name: Backend 컨테이너 시작
+      docker_container:
+        name: backend
+        image: "moongsan/backend:{{ docker_tag }}"
+        state: started
+        restart_policy: unless-stopped
+        ports:
+          - "8080:8080"
+        networks:
+          - name: moongsan-net
+        env:
+          SPRING_PROFILES_ACTIVE: "{{ deployment_env }}"
+          JAVA_OPTS: "-Xmx512m -Xms256m"
+        healthcheck:
+          test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+          interval: 30s
+          timeout: 10s
+          retries: 3
+          start_period: 60s
+        labels:
+          environment: "{{ deployment_env }}"
+          service: "backend"
+          version: "{{ docker_tag }}"
+
+    # 컨테이너 상태 확인
+    - name: Backend 컨테이너 상태 확인
+      docker_container_info:
+        name: backend
+      register: backend_container_info
+
+    - name: 컨테이너 실행 상태 표시
+      debug:
+        msg:
+          - "✅ Backend 컨테이너 상태: {{ backend_container_info.container.State.Status }}"
+          - "🔗 포트 매핑: {{ backend_container_info.container.NetworkSettings.Ports }}"
+
+    # Health Check 대기
+    - name: Backend 서비스 Ready 대기 (최대 2분)
+      uri:
+        url: "http://localhost:8080/health"
+        method: GET
+        status_code: 200
+      register: health_check
+      until: health_check.status == 200
+      retries: 24
+      delay: 5
+      ignore_errors: yes
+
+    - name: Health Check 결과 표시
+      debug:
+        msg:
+          - "{% if health_check.status == 200 %}✅ Backend 서비스가 정상적으로 시작되었습니다{% else %}⚠️ Health Check 실패 - 수동 확인이 필요합니다{% endif %}"
+          - "🔗 Health Check URL: http://localhost:8080/health"
+
+# 배포 완료 알림
+- name: "🎉 Jenkins Backend 배포 완료"
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars:
+    deployment_env: "{{ target_env | default('dev') }}"
+    docker_tag: "{{ docker_image_tag | default('latest') }}"
+  tasks:
+    - name: 배포 완료 메시지
+      debug:
+        msg:
+          - "🎉 Backend 배포가 완료되었습니다!"
+          - "🎯 환경: {{ deployment_env | upper }}"
+          - "🐳 버전: moongsan/backend:{{ docker_tag }}"
+          - "📊 다음 단계: Jenkins에서 Health Check 결과를 확인하세요"
