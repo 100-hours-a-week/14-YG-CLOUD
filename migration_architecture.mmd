@@ -1,0 +1,52 @@
+graph TD
+    subgraph "Before: Current GCP Architecture (Shared & Prod)"
+        direction LR
+        subgraph "GCP Cloud"
+            direction LR
+            subgraph "default VPC (10.178.0.0/20)"
+                DEV_VM["moongsan-dev-vm"]
+            end
+
+            subgraph "shared-vpc (10.100.0.0/24)"
+                JUMPBOX_GCP["shared-jumpbox (WireGuard)"]
+                ELK_GCP["shared-elk (ELK Stack, APM Server)"]
+            end
+
+            subgraph "prod-vpc (10.1.0.0/24)"
+                DB_GCP["prod-database"]
+                BE_GCP["prod-backend"]
+                AI_GCP["prod-ai"]
+            end
+        end
+
+        AI_GCP -- "Log/APM Data" --> ELK_GCP
+        BE_GCP -- "Log/APM Data" --> ELK_GCP
+    end
+
+    subgraph "After: Multi-Cloud Architecture (Shared on AWS, Prod on GCP)"
+        direction LR
+        subgraph "GCP Cloud"
+            direction LR
+            subgraph "default VPC (10.178.0.0/20)"
+                DEV_VM["moongsan-dev-vm"]
+            end
+
+            subgraph "prod-vpc (10.1.0.0/24)"
+                DB_GCP["prod-database"]
+                BE_GCP["prod-backend"]
+                AI_GCP["prod-ai"]
+            end
+        end
+
+        subgraph "AWS Cloud"
+            direction LR
+            subgraph "aws-shared-vpc (10.200.0.0/16)"
+                JUMPBOX_AWS["aws-shared-jumpbox (WireGuard)"]
+                ELK_AWS["aws-shared-elk (ELK Stack, APM Server)"]
+            end
+        end
+
+        prod-vpc -- "VPN Connection (IPsec)" --> aws-shared-vpc
+        AI_GCP -- "Log/APM Data" --> ELK_AWS
+        BE_GCP -- "Log/APM Data" --> ELK_AWS
+    end
