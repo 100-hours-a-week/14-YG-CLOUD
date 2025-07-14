@@ -1,8 +1,22 @@
 ---
 - name: Install OpenJDK 17
   ansible.builtin.apt:
-    name: openjdk-17-jdk
-    state: present
+    name: openjdk- name: Jenkins setup completion message (already configured)
+  ansible.builtin.debug:
+    msg:
+      - "ℹ️ Jenkins is already running and configured!"
+      - "📍 Jenkins URL (Public): http://jenkins.moongsan.com:8080"
+      - "📍 Jenkins URL (Direct): http://{{ ansible_host }}:8080"
+      - "🔧 Jenkins Version: Detected from headers"
+      - ""
+      - "⚠️ Important: Use HTTP (not HTTPS) to access Jenkins"
+      - ""
+      - "📋 Next steps:"
+      - "  1. Access Jenkins web UI to verify configuration"
+      - "  2. Check installed plugins in Manage Jenkins > Plugins"
+      - "  3. Configure credentials if needed"
+      - "  4. Create your first pipeline job"
+  when: not jenkins_needs_setuptate: present
     update_cache: yes
 
 - name: Add Jenkins GPG key

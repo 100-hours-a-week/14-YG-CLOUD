@@ -313,6 +313,15 @@ ping 10.0.1.4  # Database 서버 내부 IP
 
 > **목표**: AWS로 마이그레이션된 Jenkins를 활용하여 `dev` 환경의 지속적 배포(CD)와 `prod` 환경의 지속적 통합(CI)을 자동화합니다.
 
+### 📍 Jenkins 서버 접속 정보
+
+- **Public URL**: http://jenkins.moongsan.com:8080
+- **Direct IP**: http://3.38.150.190:8080
+- **프로토콜**: HTTP (HTTPS 아님)
+- **서버 위치**: AWS EC2 (seoul region)
+
+> ⚠️ **중요**: Jenkins 접속 시 HTTP 프로토콜을 사용해야 합니다. HTTPS는 현재 설정되어 있지 않습니다.
+
 ### 📋 CI/CD 파이프라인 전략
 
 - **`dev` 환경**: GitHub `develop` 브랜치에 Push가 발생하면, 자동으로 빌드, 테스트, Docker 이미지 생성 및 `dev` 서버 배포까지 수행합니다. (CI + CD)

@@ -102,6 +102,10 @@
 
 - **서버 위치**: AWS EC2 (3.38.150.190)
 - **서비스 상태**: 실행 중
+- **접속 URL**: 
+  - **Public Domain**: http://jenkins.moongsan.com:8080 (DNS A 레코드 설정 완료)
+  - **Direct IP**: http://3.38.150.190:8080
+- **접속 방법**: HTTP 프로토콜 사용 (HTTPS 아님)
 - **Ansible 연결**: SSH 키 구성 완료
 - **Credentials 구성**:
   - `github-pat-credentials`: GitHub 저장소 접근용
