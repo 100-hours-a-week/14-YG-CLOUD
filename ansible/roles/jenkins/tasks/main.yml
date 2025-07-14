@@ -1,22 +1,8 @@
 ---
 - name: Install OpenJDK 17
   ansible.builtin.apt:
-    name: openjdk- name: Jenkins setup completion message (already configured)
-  ansible.builtin.debug:
-    msg:
-      - "ℹ️ Jenkins is already running and configured!"
-      - "📍 Jenkins URL (Public): http://jenkins.moongsan.com:8080"
-      - "📍 Jenkins URL (Direct): http://{{ ansible_host }}:8080"
-      - "🔧 Jenkins Version: Detected from headers"
-      - ""
-      - "⚠️ Important: Use HTTP (not HTTPS) to access Jenkins"
-      - ""
-      - "📋 Next steps:"
-      - "  1. Access Jenkins web UI to verify configuration"
-      - "  2. Check installed plugins in Manage Jenkins > Plugins"
-      - "  3. Configure credentials if needed"
-      - "  4. Create your first pipeline job"
-  when: not jenkins_needs_setuptate: present
+    name: openjdk-17-jdk
+    state: present
     update_cache: yes
 
 - name: Add Jenkins GPG key
@@ -95,4 +81,90 @@
       - "  2. Check installed plugins in Manage Jenkins > Plugins"
       - "  3. Configure credentials if needed"
       - "  4. Create your first pipeline job"
+  when: not jenkins_needs_setup
+
+# Plugin installation section - Alternative approach using Jenkins plugin files
+- name: Create Jenkins plugins directory
+  ansible.builtin.file:
+    path: /var/lib/jenkins/plugins
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: "0755"
+  when: not jenkins_needs_setup
+
+- name: Define required plugins with download URLs
+  ansible.builtin.set_fact:
+    jenkins_plugins:
+      - name: docker-workflow
+        url: "https://updates.jenkins.io/latest/docker-workflow.hpi"
+      - name: pipeline-stage-view
+        url: "https://updates.jenkins.io/latest/pipeline-stage-view.hpi"
+      - name: workflow-aggregator
+        url: "https://updates.jenkins.io/latest/workflow-aggregator.hpi"
+      - name: git
+        url: "https://updates.jenkins.io/latest/git.hpi"
+      - name: github
+        url: "https://updates.jenkins.io/latest/github.hpi"
+      - name: ansible
+        url: "https://updates.jenkins.io/latest/ansible.hpi"
+      - name: ssh-slaves
+        url: "https://updates.jenkins.io/latest/ssh-slaves.hpi"
+      - name: build-timeout
+        url: "https://updates.jenkins.io/latest/build-timeout.hpi"
+      - name: credentials-binding
+        url: "https://updates.jenkins.io/latest/credentials-binding.hpi"
+      - name: timestamper
+        url: "https://updates.jenkins.io/latest/timestamper.hpi"
+      - name: ws-cleanup
+        url: "https://updates.jenkins.io/latest/ws-cleanup.hpi"
+  when: not jenkins_needs_setup
+
+- name: Check if plugins are already installed
+  ansible.builtin.stat:
+    path: "/var/lib/jenkins/plugins/{{ item.name }}.jpi"
+  register: plugin_check
+  with_items: "{{ jenkins_plugins }}"
+  when: not jenkins_needs_setup
+
+- name: Download and install Jenkins plugins
+  ansible.builtin.get_url:
+    url: "{{ item.item.url }}"
+    dest: "/var/lib/jenkins/plugins/{{ item.item.name }}.jpi"
+    owner: jenkins
+    group: jenkins
+    mode: "0644"
+  with_items: "{{ plugin_check.results }}"
+  when:
+    - not jenkins_needs_setup
+    - not item.stat.exists
+  notify: restart jenkins
+  register: plugin_downloads
+
+- name: Display manual plugin installation message
+  ansible.builtin.debug:
+    msg:
+      - "🔧 Jenkins Plugin Installation Options:"
+      - ""
+      - "Option 1 - Web UI Installation (Recommended):"
+      - "  1. Access Jenkins: http://jenkins.moongsan.com:8080"
+      - "  2. Go to 'Manage Jenkins' → 'Plugins'"
+      - "  3. Install these plugins:"
+      - "     • Docker Pipeline"
+      - "     • Pipeline: Stage View"
+      - "     • Pipeline: Workflow Aggregator"
+      - "     • Git"
+      - "     • GitHub"
+      - "     • Ansible"
+      - "     • SSH Build Agents"
+      - "     • Build Timeout"
+      - "     • Credentials Binding"
+      - "     • Timestamper"
+      - "     • Workspace Cleanup"
+      - ""
+      - "Option 2 - Automated Installation:"
+      - "  Plugins downloaded to /var/lib/jenkins/plugins/"
+      - "  Jenkins restart required to activate plugins"
+      - ""
+      - "🌐 Jenkins URL: http://jenkins.moongsan.com:8080"
   when: not jenkins_needs_setup
