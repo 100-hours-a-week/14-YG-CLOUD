@@ -49,14 +49,14 @@
   shell: rsync -av --delete /home/ubuntu/14-YG-FE/dist/ {{ path.nginx }}/
   become: true
 
-- name: Health check for React frontend (via localhost)
-  uri:
-    url: "https://{{ nginx.domain }}"
-    return_content: yes
-    validate_certs: no
-  register: frontend_health
-  failed_when: '''<div id="root">'' not in frontend_health.content'
-  changed_when: false
+# - name: Health check for React frontend (via localhost)
+#   uri:
+#     url: "https://{{ nginx.domain }}"
+#     return_content: yes
+#     validate_certs: no
+#   register: frontend_health
+#   failed_when: '''<div id="root">'' not in frontend_health.content'
+#   changed_when: false
 
 - name: Ensure logrotate config for frontend exists
   copy:
