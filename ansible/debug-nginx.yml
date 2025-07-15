@@ -1,0 +1,20 @@
+---
+- name: Debug nginx variables
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Debug be variable
+      debug:
+        var: be
+    
+    - name: Debug ai variable
+      debug:
+        var: ai
+        
+    - name: Debug nginx variable
+      debug:
+        var: nginx
+        
+    - name: Debug app_ports variable
+      debug:
+        var: app_ports

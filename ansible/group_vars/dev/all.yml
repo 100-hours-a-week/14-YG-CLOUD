@@ -19,6 +19,7 @@ app_ports:
   mysql: 3306
   redis: 6379
   mongo: 27017
+  fe: 80
 
 # 시스템 사용자 및 서비스 설정
 system:
@@ -167,6 +168,7 @@ dockerhub:
 
 # 프론트엔드 설정 (운영 환경)
 fe:
+  port: "{{ app_ports.fe }}"
   # OAuth 설정 (운영 환경)
   oauth:
     kakao:
