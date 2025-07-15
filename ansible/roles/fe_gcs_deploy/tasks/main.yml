@@ -70,7 +70,8 @@
       git:
         repo: "{{ project_repos.fe_url }}"
         dest: "{{ project_paths.fe_repo }}"
-        version: "{{ branch }}"
+        # version: "{{ branch }}"
+        version: "release/v2.0.0"
         force: yes
       become: true
 

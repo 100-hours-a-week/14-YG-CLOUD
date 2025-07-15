@@ -115,6 +115,162 @@ gsutil rm gs://YOUR-TERRAFORM-STATE-BUCKET/.terraform/LOCK_FILE
 
 ## Ansible 문제해결
 
+### 🐞 트러블슈팅: Ansible `--tags` 필터가 역할 내부로 전파되지 않음
+
+**날짜**: 2025-07-15  
+**환경**: 개발(Dev) 단일 서버 플레이북(`playbooks/dev.yml`), Ansible 2.13 이상  
+
+---
+
+#### 📝 증상
+- `ansible-playbook -i dev.ini playbooks/dev.yml --tags "db"` 실행 시  
+  - 플레이북은 정상적으로 로드되나  
+  - "include_role database" 메시지만 출력되고, 역할 내부의 모든 태스크가 스킵됨  
+
+---
+
+#### 🔎 점검 및 분석
+1. **플레이 수준 태그 확인**  
+   - 두 번째 플레이(`🚀 Dev 환경 단일 서버 배포`)에만 `tags: ["all"]` 지정  
+   - `--tags db` 로 실행하면 해당 플레이 자체가 스킵됨  
+
+2. **`include_role` 동작 방식 확인**  
+   - `include_role` 는 런타임에 역할을 동적으로 불러오며, `tags` 는 **인클루드 지점**에만 적용  
+   - 역할 내부 `tasks/main.yml` 의 태스크들은 실행 대상에 포함되지 않음  
+
+3. **Ansible 문서 확인**  
+   - `import_role` vs `include_role` 차이에 따라 태그 전파 여부가 다름
+
+---
+
+#### 🛠️ 해결 방법
+**1. `import_role` 사용으로 전환 (권장)**
+```diff
+-    - name: MySQL 데이터베이스 설정
+-      include_role:
+-        name: database
+-      tags: ["db","database"]
++    - name: MySQL 데이터베이스 설정
++      import_role:
++        name: database
++      tags: ["db","database"]
+```
+- 역할 내부의 모든 태스크가 `--tags db` 필터에 포함되어 정상 실행
+
+**2. (대안) 역할 내부 태스크에 `tags` 지정**
+- `roles/database/tasks/*.yml` 각 태스크에 `tags: ["db"]` 추가  
+
+**3. (임시) 실행 시 `all` 태그 포함**
+```bash
+ansible-playbook -i dev.ini playbooks/dev.yml --tags "all,db"
+```
+- `all` 플레이를 활성화한 상태에서 `db` 태그 태스크만 수행
+
+---
+
+#### ✅ 결과
+- `import_role` 전환 후, `--tags db` 만으로도 `database` 역할 내 모든 태스크 실행 확인  
+- 플레이북 재실행 시 성공 로그:
+  ```text
+  TASK [database : Create MySQL configuration directory] ***********************
+  ok: [dev.moongsan.com]
+  TASK [database : Run MySQL container with custom configuration] **************
+  changed: [dev.moongsan.com]
+  …
+  ```
+
+---
+
+#### 💡 교훈 및 팁
+- **정적 임포트(`import_role`)** 는 태그 전파가 필요할 때 사용  
+- **동적 인클루드(`include_role`)** 는 조건부 실행 또는 반복 인클루드 시 유용하나, 태그 전파는 직접 관리 필요  
+- 플레이북 설계 단계에서 태그 적용 범위를 미리 고려하면 효율적인 선택적 배포 가능  
+
+---
+
+### 🐞 트러블슈팅: Dev 환경 변수 구조 불일치로 인한 Role 실행 실패
+
+**날짜**: 2025-07-15  
+**환경**: 개발(Dev) 환경 통합 중, Ansible group_vars 구조 변경  
+
+---
+
+#### 📝 증상
+- Ansible 역할에서 `db.mysql.container.config_dir` 변수 참조 시 오류 발생:
+  ```text
+  'dict object' has no attribute 'mysql'
+  ```
+- `ansible -m debug -a "var=db.mysql"` 실행 시 "VARIABLE IS NOT DEFINED!" 출력
+- `db` 변수는 존재하지만 flat 구조로만 로드됨 (mysql 키 없음)
+
+---
+
+#### 🔎 점검 및 분석
+1. **변수 구조 진화 과정**  
+   - 초기: 단일 서버용 flat `db` 구조 (GitHub 원본)
+   - 현재: 3-tier 구조용 nested `db.mysql` 구조 (prod 기반)
+   - 문제: 기존 flat 구조가 새로운 nested 구조를 덮어쓰는 상황
+
+2. **변수 로딩 우선순위 확인**  
+   - `group_vars/dev/all.yml`에는 올바른 `db.mysql` 구조 존재
+   - Ansible 실행 시에는 다른 소스에서 flat `db` 구조가 로드됨
+   - 변수 우선순위: inventory > group_vars > host_vars
+
+3. **Role 요구사항 확인**  
+   - Database role이 3-tier 구조용으로 리팩토링됨
+   - `db.mysql.container.*` 변수 구조를 기대함
+
+---
+
+#### 🛠️ 해결 방법
+**1. Prod 구조 기반으로 Dev 변수 통일 (최종 해결책)**
+```bash
+# prod all.yml을 dev로 복사
+cp group_vars/prod/all.yml group_vars/dev/all.yml
+
+# dev 환경에 맞게 값들 수정
+# - env: prod → dev
+# - internal_ips: inventory 참조 → 172.21.0.1 (Docker bridge)
+# - vault 변수명: _prod_ → _dev_
+```
+
+**2. Vault 구조 통일**
+```bash
+# prod vault 구조를 dev에 적용
+cp group_vars/prod/vault.yml group_vars/dev/vault_reference.yml
+# vault_mysql_prod_password → vault_mysql_dev_password 형태로 수정
+```
+
+**3. 변수 참조 확인 및 정리**
+```bash
+# 모든 파일에서 db 정의 검색
+find . -name "*.yml" -exec grep -l "^db:" {} \;
+
+# 충돌하는 변수 파일 제거
+rm group_vars/dev/vault.yml.backup
+rm group_vars/dev/all_*
+```
+
+---
+
+#### ✅ 결과
+- Dev 환경이 prod와 동일한 변수 구조를 사용하도록 통일
+- `db.mysql.container.config_dir` 등 nested 변수 정상 인식
+- Database role 정상 실행 확인
+- 향후 다른 환경 추가 시에도 일관된 구조 유지 가능
+
+---
+
+#### 💡 교훈 및 팁
+- **변수 구조 일관성**: 모든 환경에서 동일한 변수 구조 사용
+- **점진적 마이그레이션**: 기존 환경을 새 구조로 변경할 때는 단계적 접근
+- **변수 우선순위 이해**: Ansible 변수 로딩 순서를 고려한 설계
+- **구조 통일의 장점**: Role 재사용성과 유지보수성 크게 향상
+
+---
+
+## Ansible 문제해결
+
 ### 🔐 연결 문제
 
 #### **문제**: SSH 연결 실패

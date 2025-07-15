@@ -6,7 +6,7 @@
   file:
     path: "{{ db.mysql.container.config_dir }}"
     state: directory
-    mode: '0755'
+    mode: "0755"
   become: true
 
 - name: "Create MySQL custom configuration for long polling support"
@@ -15,7 +15,7 @@
     dest: "{{ db.mysql.container.config_dir }}/custom.cnf"
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   become: true
 
 - name: "Create MySQL data directory"
@@ -24,7 +24,7 @@
     state: directory
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
-    mode: '0755'
+    mode: "0755"
   become: true
 
 - name: "Stop any existing MySQL services"
@@ -108,7 +108,7 @@
 
 - name: "Display max_connections setting"
   debug:
-    msg: 
+    msg:
       - "🔧 MySQL max_connections 설정 확인:"
       - "{{ max_connections_result.stdout_lines if max_connections_result.stdout_lines is defined else 'Configuration check failed' }}"
 
@@ -123,8 +123,6 @@
 
 - name: "Display connection status"
   debug:
-    msg: 
+    msg:
       - "📊 MySQL 연결 상태:"
       - "{{ connection_status_result.stdout_lines if connection_status_result.stdout_lines is defined else 'Status check failed' }}"
-
-

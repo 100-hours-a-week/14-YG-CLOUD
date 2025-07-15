@@ -46,67 +46,67 @@
 
     # 기본 시스템 설정
     - name: 기본 시스템 설정
-      include_role:
+      import_role:
         name: common
       tags: ["common", "base", "system"]
 
     # 14-YG-CLOUD 레포지토리 클론
     - name: 14-YG-CLOUD 레포 클론
-      include_role:
+      import_role:
         name: clone_cloud
       tags: ["clone_cloud"]
 
     # Docker 네트워크 설정
     - name: Docker 네트워크 설정
-      include_role:
+      import_role:
         name: docker_net
       tags: ["docker_net", "network"]
 
     # Nginx 설정 (SSL 포함)
     - name: Nginx 설정
-      include_role:
+      import_role:
         name: nginx_conf
       tags: ["nginx", "web"]
 
     # 데이터베이스 설정
     - name: MySQL 데이터베이스 설정
-      include_role:
+      import_role:
         name: database
       tags: ["db", "database", "data"]
 
     # Redis 설정
     - name: Redis 설정
-      include_role:
+      import_role:
         name: redis
       tags: ["redis", "cache"]
 
     # Backend 배포
     - name: Backend 서비스 배포
-      include_role:
+      import_role:
         name: be_deploy
       tags: ["be", "backend", "be_deploy", "api"]
 
     # AI 서비스 배포
     - name: AI 서비스 배포
-      include_role:
+      import_role:
         name: ai_deploy
       tags: ["ai", "ai_deploy", "ml"]
 
     # Frontend 배포
     - name: Frontend 배포
-      include_role:
+      import_role:
         name: fe_deploy
       tags: ["fe", "frontend", "fe_deploy", "web"]
 
     # 데이터베이스 백업 설정
     - name: 데이터베이스 백업 설정
-      include_role:
+      import_role:
         name: db_backup
       tags: ["db_backup", "backup"]
 
     # Kafka 클러스터 설정 (dev는 단일 노드)
     - name: Kafka 클러스터 설정
-      include_role:
+      import_role:
         name: kafka_cluster
       tags: ["kafka", "streaming"]
 
