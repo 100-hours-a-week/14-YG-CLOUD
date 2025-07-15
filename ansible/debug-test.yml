@@ -1,0 +1,27 @@
+---
+- name: Debug test  
+  hosts: dev
+  gather_facts: no
+  tasks:
+    - name: Show all db variables
+      debug:
+        var: db
+    
+    - name: Show db.mysql if exists
+      debug:
+        var: db.mysql
+      ignore_errors: yes
+    
+    - name: Check if mysql key exists in db
+      debug:
+        msg: "mysql key exists: {{ 'mysql' in db }}"
+      when: db is defined
+    
+    - name: Show service_name
+      debug:
+        var: service_name
+        
+    - name: Try to access db.mysql.container.config_dir directly
+      debug:
+        var: db.mysql.container.config_dir
+      ignore_errors: yes
