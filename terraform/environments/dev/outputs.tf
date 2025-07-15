@@ -1,5 +1,5 @@
 
-output "prod_vm_ip" {
+output "dev_vm_ip" {
   value = google_compute_address.static_ip.address
 }
 
