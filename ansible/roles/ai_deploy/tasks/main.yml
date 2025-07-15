@@ -19,7 +19,7 @@
     update: yes
     force: yes
     accept_hostkey: yes
-
+#---
 - name: Ensure PyYAML is present with version
   lineinfile:
     path: /home/ubuntu/14-YG-AI/v1/requirements.txt
@@ -28,11 +28,25 @@
     insertafter: EOF
     create: yes
 
-- name: Ensure torch==2.3.0 is present
+- name: Ensure torch>=2.2.0,<2.3.0 is present
   lineinfile:
     path: /home/ubuntu/14-YG-AI/v1/requirements.txt
     regexp: "^torch"
-    line: "torch==2.3.0"
+    line: "torch>=2.2.0,<2.3.0"
+    insertafter: EOF
+
+- name: Ensure torchvision>=0.15.2,<0.16.0 is present
+  lineinfile:
+    path: /home/ubuntu/14-YG-AI/v1/requirements.txt
+    regexp: "^torchvision"
+    line: "torchvision>=0.15.2,<0.16.0"
+    insertafter: EOF
+
+- name: Ensure numpy<2 is present
+  lineinfile:
+    path: /home/ubuntu/14-YG-AI/v1/requirements.txt
+    regexp: "^numpy"
+    line: "numpy<2"
     insertafter: EOF
 
 - name: Ensure opencv-python-headless==4.9.0.80 is present
@@ -41,7 +55,7 @@
     regexp: "^opencv-python-headless"
     line: "opencv-python-headless==4.9.0.80"
     insertafter: EOF
-
+#---
 - name: Copy Dockerfile to AI repo
   template:
     src: Dockerfile.j2
