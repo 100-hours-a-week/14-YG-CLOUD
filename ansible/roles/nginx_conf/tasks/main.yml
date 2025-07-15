@@ -39,13 +39,19 @@
     executable: pip3
   become: true
 
-- name: htpasswd 파일 생성 후 devuser 등록
-  community.general.htpasswd:
+# - name: htpasswd 파일 생성 후 devuser 등록
+#   community.general.htpasswd:
+#     path: /etc/nginx/.htpasswd
+#     name: "{{ nginx.devuser }}"
+#     password: "{{ nginx.devuser_password }}"
+#     crypt_scheme: apr_md5_crypt
+#     state: present
+#   become: true
+
+- name: htpasswd 파일이 더 이상 필요 없다면 삭제
+  ansible.builtin.file:
     path: /etc/nginx/.htpasswd
-    name: "{{ nginx.devuser }}"
-    password: "{{ nginx.devuser_password }}"
-    crypt_scheme: apr_md5_crypt
-    state: present
+    state: absent
   become: true
 
 - name: Reload nginx
