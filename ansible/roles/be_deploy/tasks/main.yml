@@ -9,7 +9,7 @@
     repo: https://github.com/100-hours-a-week/14-YG-BE.git
     dest: /home/ubuntu/14-YG-BE
     # version: "{{ branch }}"
-    version: tmp/no-kafka
+    version: release/v2.0.0
     update: yes
     force: yes
     accept_hostkey: yes
@@ -78,28 +78,28 @@
     git_commit: "{{ be_git_commit.stdout }}"
 
 # --- <운영으로 전환시 삭제> 이 부분은 Jenkins에서 처리하므로 삭제
-# - name: Copy Dockerfile to BE repo
-#   template:
-#     src: Dockerfile.j2
-#     dest: /home/ubuntu/14-YG-BE/Dockerfile
-#     mode: "0644"
-#   become: true
+- name: Copy Dockerfile to BE repo
+  template:
+    src: Dockerfile.j2
+    dest: /home/ubuntu/14-YG-BE/Dockerfile
+    mode: "0644"
+  become: true
 
-# - name: Build Docker image for backend
-#   shell: >
-#     docker build -t {{ be.image }}:{{ be.tag }}
-#     -f Dockerfile .
-#   args:
-#     chdir: /home/ubuntu/14-YG-BE
-#   become: true
+- name: Build Docker image for backend
+  shell: >
+    docker build -t {{ be.image }}:{{ be.tag }}
+    -f Dockerfile .
+  args:
+    chdir: /home/ubuntu/14-YG-BE
+  become: true
 
-# - name: DockerHub 로그인
-#   shell: echo "{{ dockerhub.password }}" | docker login --username {{ dockerhub.username }} --password-stdin
-#   become: true
+- name: DockerHub 로그인
+  shell: echo "{{ dockerhub.password }}" | docker login --username {{ dockerhub.username }} --password-stdin
+  become: true
 
-# - name: Push Docker image to registry
-#   shell: docker push {{ be.image }}:{{ be.tag }}
-#   become: true
+- name: Push Docker image to registry
+  shell: docker push {{ be.image }}:{{ be.tag }}
+  become: true
 # --- </운영으로 전환시 삭제> 이 부분은 Jenkins에서 처리하므로 삭제
 
 - name: Pull image from registry (post-push validation)

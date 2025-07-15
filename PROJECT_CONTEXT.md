@@ -132,8 +132,8 @@ feat(<브랜치명>): <제목>
 
 # 예시:
 feat(3tier): Jenkins AWS 마이그레이션 완료
-fix(cicd): Ansible 배포 스크립트 수정
-docs(portfolio): 프로젝트 컨텍스트 문서 추가
+fix(3tier): Ansible 배포 스크립트 수정
+docs(3tier): 프로젝트 컨텍스트 문서 추가
 ```
 
 ### 커밋 주기 (중요!)
