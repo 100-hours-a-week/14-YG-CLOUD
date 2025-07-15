@@ -45,45 +45,26 @@ pipeline {
         
         stage('🔨 Build & Test') {
             steps {
-                echo "=== Maven 빌드 및 테스트 ==="
+                echo "=== Gradle 빌드 및 테스트 ==="
                 
-                sh 'chmod +x ./mvnw'
+                sh 'chmod +x ./gradlew'
                 
                 sh '''
-                    ./mvnw clean test -Dspring.profiles.active=test
+                    ./gradlew clean test --info
                 '''
                 
-                publishTestResults testResultsPattern: 'target/surefire-reports/*.xml'
+                publishTestResults testResultsPattern: 'build/test-results/test/*.xml'
                 
                 sh '''
-                    ./mvnw clean package -DskipTests=true -Dspring.profiles.active=prod
-                    ls -la target/
+                    ./gradlew build -x test --info
+                    ls -la build/libs/
                 '''
             }
         }
         
-        stage('🐳 Docker Build & Push') {
+        stage(' Deploy to GCP Dev') {
             steps {
-                echo "=== Docker 이미지 빌드 및 푸시 ==="
-                
-                script {
-                    def dockerImage = docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
-                    
-                    sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest"
-                    
-                    docker.withRegistry('https://registry.hub.docker.com', DOCKERHUB_CREDENTIALS) {
-                        dockerImage.push()
-                        dockerImage.push('latest')
-                    }
-                    
-                    echo "✅ Docker 이미지 푸시 완료: ${DOCKER_IMAGE}:${DOCKER_TAG}"
-                }
-            }
-        }
-        
-        stage('🚀 Deploy to GCP Dev') {
-            steps {
-                echo "=== GCP dev 환경 배포 ==="
+                echo "=== GCP dev 환경 빌드 및 배포 ==="
                 
                 script {
                     sh '''
@@ -96,10 +77,12 @@ pipeline {
                         cd 14-YG-CLOUD
                         git pull origin feat/3tier
                         
+                        # Ansible을 통한 빌드 및 배포 (Docker 빌드 포함)
                         ansible-playbook -i ansible/dev.ini \
                             ansible/playbooks/jenkins_be_deploy.yml \
                             -e docker_image_tag=${DOCKER_TAG} \
                             -e target_env=${TARGET_ENV} \
+                            -e build_number=${BUILD_NUMBER} \
                             --tags backend
                     '''
                 }

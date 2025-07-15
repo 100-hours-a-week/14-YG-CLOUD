@@ -1,18 +1,37 @@
 # Backend CI/CD Pipeline 구성 가이드
 
-> **파일 위치**: 14-YG-BE 레포지토리 루트에 추가해야 할 파일들
+> **파일 위치**: 14-YG-BE 레포지토리 루트에 추가해야 할 파일
 
-## 📁 추가할 파일들
+## 📁 추가할 파일
 
 ### 1. Jenkinsfile (확장자 없이)
 - **위치**: `14-YG-BE/Jenkinsfile`
 - **내용**: 이 디렉토리의 `Jenkinsfile` 복사
 
-### 2. Dockerfile  
-- **위치**: `14-YG-BE/Dockerfile`
-- **내용**: 이 디렉토리의 `Dockerfile` 복사
+## 🏗️ 빌드 시스템 특징
 
-## 🚀 Jenkins 파이프라인 생성 단계
+### Gradle 기반 빌드
+- **빌드 도구**: Gradle (gradlew 사용)
+- **테스트**: `./gradlew clean test --info`
+- **빌드**: `./gradlew build -x test --info`
+
+### Docker 빌드 전략
+- **Dockerfile**: Ansible 템플릿(`be_deploy/templates/Dockerfile.j2`)에서 관리
+- **빌드 위치**: GCP dev 서버에서 직접 빌드
+- **이미지 푸시**: 빌드 후 Docker Hub 자동 푸시
+
+## 🚀 파이프라인 단계별 설명
+
+1. **🚀 Setup**: 환경 정보 출력 및 Git 상태 확인
+2. **🔨 Build & Test**: Gradle을 통한 빌드 및 테스트 실행
+3. **🚀 Deploy to GCP Dev**: 
+   - Ansible을 통한 Backend 소스 클론
+   - Dockerfile 템플릿 생성
+   - Docker 이미지 빌드 및 푸시
+   - 컨테이너 배포
+4. **🔍 Health Check**: 배포 후 애플리케이션 상태 확인
+
+## � Jenkins 파이프라인 생성 단계
 
 ### Step 1: Jenkins 웹 UI 접속
 ```
@@ -41,32 +60,18 @@ http://jenkins.moongsan.com:8080
 
 ### Step 4: 필수 Credentials 설정
 
-**A. Docker Hub Credentials**
+**A. GCP SSH Key**
 1. **Manage Jenkins** → **Credentials** → **System** → **Global credentials**
 2. **Add Credentials**:
-   - **Kind**: Username with password
-   - **Username**: Docker Hub 사용자명
-   - **Password**: Docker Hub 비밀번호
-   - **ID**: `dockerhub-credentials`
-
-**B. GCP SSH Key**
-1. **Add Credentials**:
    - **Kind**: SSH Username with private key
    - **Username**: `ubuntu`
    - **Private Key**: GCP 인스턴스 SSH private key
    - **ID**: `gcp-ssh-key`
 
-## 🔧 파이프라인 단계별 설명
-
-1. **🚀 Setup**: 환경 정보 출력 및 Git 상태 확인
-2. **🔨 Build & Test**: Maven을 통한 빌드 및 테스트 실행
-3. **🐳 Docker Build & Push**: Docker 이미지 빌드 후 Docker Hub 푸시
-4. **🚀 Deploy to GCP Dev**: Ansible을 통한 GCP dev 환경 배포
-5. **🔍 Health Check**: 배포 후 애플리케이션 상태 확인
-
 ## ⚠️ 주의사항
 
 - **Jenkinsfile**: 반드시 확장자 없이 `Jenkinsfile`로 저장
-- **브랜치**: `tmp/no-kafka` 브랜치에 파일들 추가
-- **권한**: GitHub webhook 설정 필요 (저장소 설정에서)
-- **네트워크**: Jenkins(AWS) → GCP dev 환경 접근 가능한지 확인
+- **브랜치**: `tmp/no-kafka` 브랜치에 파일 추가
+- **Docker 빌드**: GCP dev 서버에서 실행 (Jenkins 서버가 아님)
+- **Dockerfile**: Ansible 템플릿으로 관리됨 (별도 Dockerfile 불필요)
+- **네트워크**: Jenkins(AWS) → GCP dev 환경 SSH 접근 필요

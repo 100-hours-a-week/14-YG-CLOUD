@@ -37,7 +37,7 @@
     - name: Backend 배포 시작 알림
       debug:
         msg:
-          - "🚀 Backend 배포를 시작합니다"
+          - "🚀 Backend 빌드 및 배포를 시작합니다"
           - "🐳 이미지: moongsan/backend:{{ docker_tag }}"
           - "🎯 환경: {{ deployment_env }}"
     
@@ -62,18 +62,60 @@
         force_kill: yes
       ignore_errors: yes
 
+    # Backend 소스 코드 클론/업데이트
+    - name: Backend 저장소 클론
+      git:
+        repo: "{{ project_repos.be_url }}"
+        dest: "{{ project_paths.be_repo }}"
+        version: "tmp/no-kafka"
+        force: yes
+
+    # Dockerfile 생성 (j2 템플릿 사용)
+    - name: Dockerfile 생성
+      template:
+        src: "{{ role_path }}/../be_deploy/templates/Dockerfile.j2"
+        dest: "{{ project_paths.be_repo }}/Dockerfile"
+        mode: "0644"
+
+    # Docker 이미지 빌드
+    - name: Backend Docker 이미지 빌드
+      docker_image:
+        name: "moongsan/backend:{{ docker_tag }}"
+        build:
+          path: "{{ project_paths.be_repo }}"
+          dockerfile: Dockerfile
+        source: build
+        force_source: yes
+
+    # latest 태그 추가
+    - name: latest 태그 추가
+      docker_image:
+        name: "moongsan/backend:latest"
+        repository: "moongsan/backend:{{ docker_tag }}"
+        source: local
+
+    # Docker Hub 로그인 및 푸시 (옵션)
+    - name: Docker Hub에 이미지 푸시
+      docker_image:
+        name: "moongsan/backend"
+        tag: "{{ docker_tag }}"
+        push: yes
+        source: local
+      when: push_to_registry | default(true)
+    
+    - name: latest 태그 푸시
+      docker_image:
+        name: "moongsan/backend"
+        tag: "latest"
+        push: yes
+        source: local
+      when: push_to_registry | default(true)
+
     # Docker 네트워크 생성
     - name: moongsan-net 네트워크 생성
       docker_network:
         name: moongsan-net
         state: present
-
-    # 새 이미지 Pull
-    - name: Backend 이미지 Pull
-      docker_image:
-        name: "moongsan/backend:{{ docker_tag }}"
-        source: pull
-        force_source: yes
 
     # Backend 컨테이너 실행
     - name: Backend 컨테이너 시작
