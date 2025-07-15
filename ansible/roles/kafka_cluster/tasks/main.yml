@@ -1,0 +1,100 @@
+---
+# 1. 기존 네트워크 존재 확인 (생성하지 않음)
+- name: Check if moongsan-net network exists
+  shell: docker network ls | grep moongsan-net
+  register: network_check
+  ignore_errors: yes
+
+- name: Display network status
+  debug:
+    msg: "moongsan-net network {{ 'exists' if network_check.rc == 0 else 'does not exist' }}"
+
+# 2. Kafka 전용 디렉토리 생성
+- name: Create Kafka compose directory
+  file:
+    path: "{{ kafka.compose_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+# 3. Docker Compose 파일 생성
+- name: Generate Docker Compose file for Kafka cluster
+  template:
+    src: docker-compose.kafka.yml.j2
+    dest: "{{ kafka.compose_dir }}/docker-compose.kafka.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+
+# 4. 안전한 Kafka 클러스터 시작 (기존 서비스 영향 없음)
+- name: Start Kafka cluster (without affecting existing services)
+  community.docker.docker_compose_v2:
+    project_src: "{{ kafka.compose_dir }}"
+    files:
+      - docker-compose.kafka.yml
+    state: present
+    pull: always
+    recreate: auto  # 변경된 컨테이너만 자동으로 재생성
+
+# 5. 서비스 상태 확인
+- name: Wait for Zookeeper to be ready
+  wait_for:
+    host: "localhost"
+    port: "{{ item }}"
+    delay: 10
+    timeout: 120
+  loop:
+    - 2181
+    - 2182
+    - 2183
+
+- name: Wait for Kafka brokers to be ready
+  wait_for:
+    host: "localhost"
+    port: "{{ item }}"
+    delay: 20
+    timeout: 180
+  loop:
+    - 19092
+    - 19093
+    - 19094
+
+# 6. 기본 토픽 생성 (선택사항)
+- name: Create basic Kafka topics
+  shell: |
+    sleep 30  # Kafka가 완전히 준비될 때까지 대기
+    docker exec kafka-1 kafka-topics.sh --create --topic user-events --bootstrap-server kafka-1:9092 --partitions 6 --replication-factor 3 --if-not-exists
+    docker exec kafka-1 kafka-topics.sh --create --topic order-events --bootstrap-server kafka-1:9092 --partitions 6 --replication-factor 3 --if-not-exists
+    docker exec kafka-1 kafka-topics.sh --create --topic notification-events --bootstrap-server kafka-1:9092 --partitions 3 --replication-factor 3 --if-not-exists
+  ignore_errors: yes
+
+# 7. 헬스체크 스크립트 배포
+- name: Copy Kafka health check script
+  template:
+    src: kafka_health_check.sh.j2
+    dest: /home/{{ ansible_user }}/kafka_health_check.sh
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+# 8. 최종 상태 출력
+- name: Display Kafka cluster status
+  debug:
+    msg: |
+      ✅ Kafka 클러스터가 안전하게 배포되었습니다!
+      
+      🔗 연결 정보:
+      - Internal (BE → Kafka): kafka-1:9092,kafka-2:9092,kafka-3:9092
+      - External (로컬 → Kafka): {{ ansible_default_ipv4.address }}:19092,19093,19094
+      - Kafka UI: http://{{ ansible_default_ipv4.address }}:8089
+      
+      📊 관리 명령어:
+      - 헬스체크: ./kafka_health_check.sh
+      - 토픽 조회: docker exec kafka-1 kafka-topics.sh --list --bootstrap-server kafka-1:9092
+      - 로그 확인: docker-compose -f {{ kafka.compose_dir }}/docker-compose.kafka.yml logs -f
+      
+      ⚠️  참고사항:
+      - 기존 서비스(BE, AI, DB 등)는 영향받지 않음
+      - moongsan-net 네트워크를 공유하여 내부 통신 가능
+      - BE 환경변수에 이미 Kafka 설정이 추가됨

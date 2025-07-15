@@ -26,3 +26,4 @@
     - {role: redis, tags: redis}
     - {role: db_fix, tags: db_fix} # db dump 파일 복구
     - {role: docker_net, tags: docker_net} # docker network 생성
+    - {role: kafka_cluster, tags: kafka} # kafka + zookeeper cluster

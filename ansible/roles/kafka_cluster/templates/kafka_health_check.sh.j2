@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# Kafka 클러스터 헬스체크 스크립트
+# 생성일: {{ ansible_date_time.date }}
+
+echo "🔍 Kafka 클러스터 상태 확인 중..."
+echo "=================================="
+
+# 1. Docker 컨테이너 상태 확인
+echo "📋 컨테이너 상태:"
+docker ps --filter "name=kafka" --filter "name=zookeeper" --format "table {{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}\t{{ '{{' }}.Ports{{ '}}' }}"
+
+echo ""
+
+# 2. Zookeeper 연결 테스트
+echo "🔗 Zookeeper 연결 테스트:"
+for port in 2181 2182 2183; do
+    if nc -z localhost $port; then
+        echo "  ✅ Zookeeper:$port - 연결 성공"
+    else
+        echo "  ❌ Zookeeper:$port - 연결 실패"
+    fi
+done
+
+echo ""
+
+# 3. Kafka 브로커 연결 테스트
+echo "🔗 Kafka 브로커 연결 테스트:"
+for port in 19092 19093 19094; do
+    if nc -z localhost $port; then
+        echo "  ✅ Kafka:$port - 연결 성공"
+    else
+        echo "  ❌ Kafka:$port - 연결 실패"
+    fi
+done
+
+echo ""
+
+# 4. Kafka 토픽 목록 조회
+echo "📂 생성된 토픽 목록:"
+if docker exec kafka-1 kafka-topics.sh --list --bootstrap-server kafka-1:9092 2>/dev/null; then
+    echo "  ✅ 토픽 조회 성공"
+else
+    echo "  ❌ 토픽 조회 실패 - Kafka가 준비되지 않았을 수 있습니다"
+fi
+
+echo ""
+
+# 5. 클러스터 메타데이터 확인
+echo "🔧 클러스터 메타데이터:"
+if docker exec kafka-1 kafka-broker-api-versions.sh --bootstrap-server kafka-1:9092 2>/dev/null | head -5; then
+    echo "  ✅ 클러스터 메타데이터 조회 성공"
+else
+    echo "  ❌ 클러스터 메타데이터 조회 실패"
+fi
+
+echo ""
+
+# 6. 메모리 및 디스크 사용량
+echo "💾 리소스 사용량:"
+docker stats --no-stream --format "table {{ '{{' }}.Name{{ '}}' }}\t{{ '{{' }}.CPUPerc{{ '}}' }}\t{{ '{{' }}.MemUsage{{ '}}' }}" $(docker ps --filter "name=kafka" --filter "name=zookeeper" -q)
+
+echo ""
+echo "=================================="
+echo "📊 헬스체크 완료!"
+echo "🌐 Kafka UI: http://{{ ansible_default_ipv4.address }}:8089"
+echo "🔗 External Bootstrap: {{ ansible_default_ipv4.address }}:19092,19093,19094"
