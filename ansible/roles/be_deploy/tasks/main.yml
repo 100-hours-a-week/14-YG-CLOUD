@@ -8,8 +8,8 @@
   git:
     repo: https://github.com/100-hours-a-week/14-YG-BE.git
     dest: /home/ubuntu/14-YG-BE
-    # version: "{{ branch }}"
-    version: release/v2.0.0
+    version: "{{ branch }}"
+    # version: release/v2.0.0
     update: yes
     force: yes
     accept_hostkey: yes

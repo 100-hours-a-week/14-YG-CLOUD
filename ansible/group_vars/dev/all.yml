@@ -8,9 +8,10 @@ branch: dev # dev 환경은 dev 브랜치 사용
 
 # 네트워크 정보 (dev 환경 - 단일 서버)
 internal_ips:
-  database: "172.21.0.1" # Docker bridge IP
-  backend: "172.21.0.1"
-  ai: "172.21.0.1"
+  database: "mysql-moongsan" # Docker bridge IP
+  # database: "host.docker.internal"
+  backend: "be-moongsan"
+  ai: "ai-moongsan"
 
 # 애플리케이션 포트
 app_ports:
@@ -64,7 +65,7 @@ db:
   # MySQL 설정
   mysql:
     name: "{{ service_name }}_{{ env }}_db"
-    url: "jdbc:mysql://172.21.0.1:{{ app_ports.mysql }}/{{ service_name }}_{{ env }}_db?serverTimezone=Asia/Seoul"
+    url: "jdbc:mysql://{{ internal_ips.database }}:{{ app_ports.mysql }}/{{ service_name }}_{{ env }}_db?serverTimezone=Asia/Seoul"
     user: "{{ service_name }}_admin"
     password: "{{ vault_mysql_dev_password }}" # Vault로 관리
     driver: com.mysql.cj.jdbc.Driver
@@ -135,7 +136,8 @@ db:
   # Redis 설정 - 운영 환경
   redis:
     image: "redis:7.2-alpine"
-    container_name: "redis-{{ service_name }}"
+    # container_name: "redis-{{ service_name }}"
+    container_name: "my-redis"
     host: "redis-{{ service_name }}"
     port: "{{ app_ports.redis }}"
     # Master mode configuration
@@ -152,8 +154,10 @@ db:
   mongo:
     image: "mongo"
     tag: "6.0.7"
-    container_name: "mongo-{{ service_name }}"
-    host: "mongo-{{ service_name }}"
+    # container_name: "mongo-{{ service_name }}"
+    container_name: "my-mongo"
+    # host: "mongo-{{ service_name }}"
+    host: "my-mongo"
     port: "{{ app_ports.mongo }}"
     # 운영 환경 MongoDB 인증 설정 (현재는 test와 동일하게 미사용)
     # auth:
