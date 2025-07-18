@@ -86,7 +86,7 @@ VPC → 서브넷 → "서브넷 생성" 클릭
 - IPv4 서브넷 CIDR 블록: 10.2.1.0/24
 - 태그:
   * Name: aws-prod-public-subnet
-  * Type: Public
+  * Type: public
   * Environment: prod
 
 서브넷 2 - Private:
@@ -96,7 +96,7 @@ VPC → 서브넷 → "서브넷 생성" 클릭
 - IPv4 서브넷 CIDR 블록: 10.2.2.0/24
 - 태그:
   * Name: aws-prod-private-subnet
-  * Type: Private
+  * Type: private
   * Environment: prod
 
 서브넷 3 - Database:
@@ -106,7 +106,7 @@ VPC → 서브넷 → "서브넷 생성" 클릭
 - IPv4 서브넷 CIDR 블록: 10.2.3.0/24
 - 태그:
   * Name: aws-prod-database-subnet
-  * Type: Database
+  * Type: database
   * Environment: prod
 ```
 
@@ -157,7 +157,7 @@ VPC → 라우팅 테이블 → "라우팅 테이블 생성"
 - VPC: aws-prod-vpc
 - 태그:
   * Name: aws-prod-public-rt
-  * Type: Public
+  * Type: public
   * Environment: prod
 
 라우팅 규칙 추가:
@@ -173,7 +173,7 @@ VPC → 라우팅 테이블 → "라우팅 테이블 생성"
 - VPC: aws-prod-vpc
 - 태그:
   * Name: aws-prod-private-rt
-  * Type: Private
+  * Type: private
   * Environment: prod
 
 라우팅 규칙 추가:
@@ -188,7 +188,7 @@ VPC → 라우팅 테이블 → "라우팅 테이블 생성"
 - VPC: aws-prod-vpc
 - 태그:
   * Name: aws-prod-database-rt
-  * Type: Database
+  * Type: database
   * Environment: prod
 
 라우팅 규칙 추가:
