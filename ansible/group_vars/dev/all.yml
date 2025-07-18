@@ -331,14 +331,14 @@ gcp:
 
   # AI 서비스용 GCP 설정
   ai:
-    credentials: deft-observer-456807-c5-e9dda0532301.json
-    project: deft-observer-456807-c5
+    credentials: ktb-2-moongsan-3dcd487686ee.json
+    project: ktb-2-moongsan
     location: us-central1
     private_key_id: "{{ vault_gcp_ai_private_key_id }}"
     private_key: "{{ vault_gcp_ai_private_key }}"
-    client_email: vertex-gemini-api@deft-observer-456807-c5.iam.gserviceaccount.com
-    client_id: "116266968708421115648"
-    client_cert_url: https://www.googleapis.com/robot/v1/metadata/x509/vertex-gemini-api%40deft-observer-456807-c5.iam.gserviceaccount.com
+    client_email: vertex-ai-user@ktb-2-moongsan.iam.gserviceaccount.com
+    client_id: "103791627762366389634"
+    client_cert_url: https://www.googleapis.com/robot/v1/metadata/x509/vertex-ai-user%40ktb-2-moongsan.iam.gserviceaccount.com
 
 # SSL/TLS 설정 (운영 환경 보안 강화)
 ssl:
