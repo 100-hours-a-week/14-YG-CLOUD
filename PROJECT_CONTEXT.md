@@ -3,9 +3,9 @@
 > **목적**: AI 어시스턴트가 프로젝트 상황을 빠르게 파악할 수 있도록 핵심 정보를 정리한 문서
 
 ## 📅 최종 업데이트
-- **날짜**: 2025년 7월 14일
+- **날짜**: 2025년 7월 18일
 - **브랜치**: `feat/3tier`
-- **상태**: Jenkins 플러그인 설치 완료, CI/CD 파이프라인 구성 준비
+- **상태**: AWS Shared 환경 ELK Stack 완료, AWS Prod 마이그레이션 계획 수립 완료
 
 ## 🌟 프로젝트 개요
 
@@ -40,27 +40,38 @@
   - 도메인 설정: jenkins.moongsan.com:8080
   - 필수 플러그인 설치 완료 (Docker, Pipeline, Git, Ansible 등)
   - 플러그인 설치 권한 문제 해결 (CLI → 직접 다운로드 방식)
+- [x] **ELK Stack AWS 마이그레이션 완료** (2025-07-18)
+  - ELK Stack 서버 AWS EC2에 설치 완료: aws-shared-elk (43.203.65.98)
+  - HTTPS 도메인 설정: elk.test.moongsan.com
+  - Elasticsearch, Kibana, Logstash 완전 자동화 배포
+  - SSL 인증서 자동 발급 및 갱신 설정
+- [x] **WireGuard VPN AWS 마이그레이션 완료** (2025-07-18)
+  - WireGuard 서버 AWS EC2에 설치: aws-shared-wireguard (3.35.93.111)
+  - Terraform 자동화 구성 완료
+- [x] **AWS Prod 마이그레이션 상세 계획 수립** (2025-07-18)
+  - 6서버 아키텍처 설계 (Backend, AI GPU, Database, Vector DB, Redis, Kafka)
+  - 비용 최적화 전략 ($273/월, 스케줄링 + Blue-Green 배포)
+  - 상세 AWS 콘솔 구성 가이드 완성
+  - aws-* 네이밍 컨벤션 표준화
 
 ### 🔄 진행 중인 작업
-- [ ] **Jenkins CI/CD 파이프라인 구성** (최우선)
+- [ ] **AWS Prod 환경 실제 구축** (최우선)
+  - **배경**: 상세 마이그레이션 계획 수립 완료
+  - **대상**: VPC, EC2 6대 서버, ALB, Lambda 스케줄러 구성
+  - **상태**: AWS 콘솔 구성 가이드 준비 완료, 실제 구축 예정
+- [ ] **Jenkins CI/CD 파이프라인 구성** (후속)
   - **배경**: Jenkins 서버 설치 완료, 파이프라인 생성 필요
   - **대상**: Backend 서비스 GCP dev 환경 배포 파이프라인
   - **상태**: Jenkinsfile 작성 및 첫 파이프라인 생성 예정
-- [ ] **Shared 환경 나머지 AWS 마이그레이션** (진행 중)
-  - **배경**: Jenkins 이전 완료, 나머지 리소스 이전 필요
-  - **대상**: shared VPC의 기타 리소스들
-  - **상태**: Jenkins 완료 → 기타 리소스 순차 이전
-- [ ] **Prod 환경 AWS 마이그레이션** (후속)
-  - **대상**: 운영 환경 전체
-  - **전략**: Shared 환경 이전 완료 후 진행
 
 ### ⏳ 예정 작업
+- [ ] **AWS Prod 애플리케이션 배포**
+  - Ansible을 통한 6서버 애플리케이션 자동 배포
+  - 기존 GCP 데이터 마이그레이션
 - [ ] **Cross-cloud 네트워킹 구성**
   - AWS Jenkins ↔ GCP dev 환경 연결 설정
   - VPC 피어링 또는 VPN 터널 구성
 - [ ] 기존 Ansible 역할 통합 (`ai_deploy`, `be_deploy`, `fe_deploy`)
-- [ ] Shared 환경 전체 AWS 이전 완료
-- [ ] Prod 환경 AWS 마이그레이션 계획 수립
 - [ ] 포트폴리오 문서 통합 작성
 
 ## 🎯 중요한 해결된 문제
@@ -192,14 +203,17 @@ docs(3tier): 프로젝트 컨텍스트 문서 추가
 
 ## 🎯 다음 우선순위 작업
 
-1. **Shared 환경 AWS 마이그레이션 완료**
-   - Jenkins 설치 및 구성
-   - 기타 Shared 리소스 이전
-2. **기존 Ansible 역할과 Jenkins 연동**
-3. **dev 환경 CI/CD 파이프라인 구성** (GCP)
-4. **prod 환경 AWS 마이그레이션 계획**
-5. **prod 환경 CI 파이프라인 구성** (AWS)
-6. **통합 포트폴리오 문서 작성**
+1. **AWS Prod 환경 실제 구축** (최우선)
+   - VPC 및 네트워크 구성 (aws-prod-vpc)
+   - EC2 6대 서버 생성 및 보안 그룹 설정
+   - ALB 및 Lambda 스케줄러 구성
+2. **AWS Prod 애플리케이션 배포**
+   - Ansible을 통한 자동 배포
+   - 기존 GCP 데이터 마이그레이션
+3. **Jenkins CI/CD 파이프라인 구성**
+   - dev 환경 CI/CD 파이프라인 (GCP)
+   - prod 환경 CI 파이프라인 (AWS)
+4. **통합 포트폴리오 문서 작성**
 
 ## 🚨 주의사항
 
