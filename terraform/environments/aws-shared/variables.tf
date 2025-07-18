@@ -48,3 +48,10 @@ variable "aws_key_name" {
   description = "Key pair name for Jenkins EC2 instance SSH access"
   type        = string
 }
+
+# ELK Stack variables
+variable "elk_instance_type" {
+  description = "Instance type for ELK Stack EC2 instance"
+  type        = string
+  default     = "t3.medium" # 2 vCPU, 4 GB Memory
+}

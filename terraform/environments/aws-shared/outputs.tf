@@ -12,3 +12,23 @@ output "jenkins_public_ip" {
   description = "The public IP address of the Jenkins EC2 instance"
   value       = aws_instance.jenkins_server.public_ip
 }
+
+output "elk_public_ip" {
+  description = "The public IP address of the ELK EC2 instance"
+  value       = aws_instance.elk_server.public_ip
+}
+
+output "elk_elastic_ip" {
+  description = "The Elastic IP address of the ELK EC2 instance"
+  value       = aws_eip.elk_eip.public_ip
+}
+
+output "wireguard_public_ip" {
+  description = "The public IP address of the WireGuard EC2 instance"
+  value       = aws_instance.wireguard_server.public_ip
+}
+
+output "wireguard_elastic_ip" {
+  description = "The Elastic IP address of the WireGuard EC2 instance"
+  value       = aws_eip.wireguard_eip.public_ip
+}
