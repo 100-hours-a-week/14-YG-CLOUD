@@ -1,0 +1,290 @@
+# 🚀 AWS ELK Stack 배포 플레이북
+# 
+# 사용법:
+#   ansible-playbook -i shared.ini playbooks    - name: Elasticsearch 설정 파일 복사
+      copy:
+        src:    - name: Kibana 설정 파일 복사
+      copy:
+        src: "../../elk-configs/kibana/kibana-aws.yml"
+        dest: /etc/kibana/kibana.yml
+        owner: root
+        group: kibana
+        mode: '0644'
+        backup: yeselk-configs/elasticsearch/elasticsearch-aws.yml"
+        dest: /etc/elasticsearch/elasticsearch.yml
+        owner: root
+        group: elasticsearch
+        mode: '0660'
+        backup: yes
+
+    - name: JVM 힙 크기 설정
+      copy:
+        content: |
+          -Xms1g
+          -Xmx1g
+        dest: /etc/elasticsearch/jvm.options.d/heap.options
+        owner: root
+        group: elasticsearch
+        mode: '0644'
+
+    - name: Elasticsearch 로그 디렉토리 권한 설정
+      file:
+        path: /var/log/elasticsearch
+        owner: elasticsearch
+        group: elasticsearch
+        mode: '0755'
+        state: directoryaws_elk.yml
+
+# 배포 시작 알림
+- name: "🚀 AWS ELK Stack 배포 시작"
+  hosts: localhost
+  connection: local
+  gather_facts: yes
+  tasks:
+    - name: 배포 정보 표시
+      debug:
+        msg:
+          - "🎯 배포 대상: AWS ELK Stack"
+          - "📅 배포 시간: {{ ansible_date_time.iso8601 }}"
+          - "👤 실행 사용자: {{ ansible_user_id }}"
+          - "🖥️  대상 호스트: aws-shared-elk"
+
+# 1단계: 기본 시스템 설정
+- name: "1️⃣ 기본 시스템 설정 (AWS ELK)"
+  hosts: aws-shared-elk
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: 시스템 패키지 업데이트
+      apt:
+        update_cache: yes
+        upgrade: dist
+        cache_valid_time: 86400
+
+    - name: 필수 패키지 설치
+      apt:
+        name:
+          - curl
+          - wget
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+          - lsb-release
+          - htop
+          - unzip
+          - jq
+        state: present
+
+    - name: Docker 설치 확인
+      command: docker --version
+      register: docker_check
+      ignore_errors: yes
+
+    - name: Docker 그룹에 ubuntu 사용자 추가
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+      when: docker_check.rc == 0
+
+# 2단계: Elasticsearch 설치
+- name: "2️⃣ Elasticsearch 설치"
+  hosts: aws-shared-elk
+  become: yes
+  gather_facts: yes
+  vars:
+    elasticsearch_version: "8.15.0"
+  tasks:
+    - name: Elasticsearch GPG 키 추가
+      apt_key:
+        url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+        state: present
+
+    - name: Elasticsearch APT 저장소 추가
+      apt_repository:
+        repo: "deb https://artifacts.elastic.co/packages/8.x/apt stable main"
+        state: present
+
+    - name: Elasticsearch 설치
+      apt:
+        name: elasticsearch
+        state: present
+        update_cache: yes
+
+    - name: Elasticsearch 설정 파일 복사
+      copy:
+        src: "../../elk-configs/elasticsearch/elasticsearch.yml"
+        dest: "/etc/elasticsearch/elasticsearch.yml"
+        owner: root
+        group: elasticsearch
+        mode: "0660"
+        backup: yes
+
+    - name: Elasticsearch 서비스 시작 및 활성화
+      systemd:
+        name: elasticsearch
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: Elasticsearch 포트 개방 대기
+      wait_for:
+        port: 9200
+        host: localhost
+        delay: 30
+        timeout: 300
+
+# 3단계: Kibana 설치
+- name: "3️⃣ Kibana 설치"
+  hosts: aws-shared-elk
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Kibana 설치
+      apt:
+        name: kibana
+        state: present
+
+    - name: Kibana 설정 파일 복사
+      copy:
+        src: "../../elk-configs/kibana/kibana-aws.yml"
+        dest: "/etc/kibana/kibana.yml"
+        owner: root
+        group: kibana
+        mode: "0660"
+        backup: yes
+
+    - name: Kibana 서비스 시작 및 활성화
+      systemd:
+        name: kibana
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: Kibana 포트 개방 대기
+      wait_for:
+        port: 5601
+        host: localhost
+        delay: 30
+        timeout: 300
+
+# 4단계: Logstash 설치
+- name: "4️⃣ Logstash 설치"
+  hosts: aws-shared-elk
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Logstash 설치
+      apt:
+        name: logstash
+        state: present
+
+    - name: Logstash 설정 디렉토리 생성
+      file:
+        path: /etc/logstash/conf.d
+        state: directory
+        owner: root
+        group: logstash
+        mode: "0755"
+
+    - name: Logstash 파이프라인 설정 파일 복사
+      copy:
+        src: "../../elk-configs/logstash/beats-input.conf"
+        dest: "/etc/logstash/conf.d/beats-input.conf"
+        owner: root
+        group: logstash
+        mode: "0644"
+        backup: yes
+
+    - name: Logstash 서비스 시작 및 활성화
+      systemd:
+        name: logstash
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+# 5단계: APM Server 설치
+- name: "5️⃣ APM Server 설치"
+  hosts: aws-shared-elk
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: APM Server 설치
+      apt:
+        name: apm-server
+        state: present
+
+    - name: APM Server 기본 설정 생성
+      copy:
+        content: |
+          apm-server:
+            host: "0.0.0.0:8200"
+          
+          output.elasticsearch:
+            hosts: ["localhost:9200"]
+          
+          setup.kibana:
+            host: "localhost:5601"
+        dest: /etc/apm-server/apm-server.yml
+        owner: root
+        group: apm-server
+        mode: "0600"
+        backup: yes
+
+    - name: APM Server 서비스 시작 및 활성화
+      systemd:
+        name: apm-server
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: APM Server 포트 개방 대기
+      wait_for:
+        port: 8200
+        host: localhost
+        delay: 10
+        timeout: 120
+
+# 배포 완료 알림
+- name: "✅ AWS ELK Stack 배포 완료"
+  hosts: localhost
+  connection: local
+  gather_facts: yes
+  tasks:
+    - name: 배포 완료 정보 표시
+      debug:
+        msg:
+          - "🎉 AWS ELK Stack 배포가 완료되었습니다!"
+          - "⏰ 완료 시간: {{ ansible_date_time.iso8601 }}"
+          - ""
+          - "📋 배포된 서비스:"
+          - "  🔍 Elasticsearch: https://43.203.65.98:9200"
+          - "  📊 Kibana: http://43.203.65.98:5601"
+          - "  📥 Logstash: 43.203.65.98:5044"
+          - "  📈 APM Server: http://43.203.65.98:8200"
+          - ""
+          - "🔗 다음 단계:"
+          - "  1. DNS 레코드 업데이트 (elk.moongsan.com → 43.203.65.98)"
+          - "  2. 로그 수집 설정 변경"
+          - "  3. 기존 GCP ELK 서비스 중지"
+
+  handlers:
+    - name: restart elasticsearch
+      systemd:
+        name: elasticsearch
+        state: restarted
+
+    - name: restart kibana
+      systemd:
+        name: kibana
+        state: restarted
+
+    - name: restart logstash
+      systemd:
+        name: logstash
+        state: restarted
+
+    - name: restart apm-server
+      systemd:
+        name: apm-server
+        state: restarted

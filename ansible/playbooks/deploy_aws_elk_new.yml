@@ -1,0 +1,284 @@
+# 🚀 AWS ELK Stack 배포 플레이북
+#
+# 사용법:
+#   ansible-playbook -i shared.ini playbooks/deploy_aws_elk.yml -v
+
+---
+- name: "🚀 AWS ELK Stack 배포 시작"
+  hosts: localhost
+  gather_facts: yes
+  tasks:
+    - name: 배포 정보 표시
+      debug:
+        msg:
+          - "🎯 배포 대상: AWS ELK Stack"
+          - "📅 배포 시간: {{ ansible_date_time.iso8601 }}"
+          - "👤 실행 사용자: {{ ansible_user_id }}"
+          - "🖥️ 대상 호스트: aws-shared-elk"
+
+# 1단계: 기본 시스템 설정
+- name: "1️⃣ 기본 시스템 설정 (AWS ELK)"
+  hosts: aws-shared-elk
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: 시스템 패키지 업데이트
+      apt:
+        upgrade: dist
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: 필수 패키지 설치
+      apt:
+        name:
+          - curl
+          - wget
+          - gnupg
+          - software-properties-common
+          - apt-transport-https
+          - ca-certificates
+          - openjdk-11-jdk
+        state: present
+
+    - name: Docker 설치 확인
+      command: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Docker 그룹에 ubuntu 사용자 추가
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+# 2단계: Elasticsearch 설치
+- name: "2️⃣ Elasticsearch 설치"
+  hosts: aws-shared-elk
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Elasticsearch GPG 키 추가
+      apt_key:
+        url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+        state: present
+
+    - name: Elasticsearch APT 저장소 추가
+      apt_repository:
+        repo: "deb https://artifacts.elastic.co/packages/8.x/apt stable main"
+        state: present
+
+    - name: Elasticsearch 설치
+      apt:
+        name: elasticsearch
+        state: present
+        update_cache: yes
+
+    - name: Elasticsearch 설정 파일 복사
+      copy:
+        src: "../../elk-configs/elasticsearch/elasticsearch-aws.yml"
+        dest: /etc/elasticsearch/elasticsearch.yml
+        owner: root
+        group: elasticsearch
+        mode: "0660"
+        backup: yes
+
+    - name: JVM 힙 크기 설정
+      copy:
+        content: |
+          -Xms1g
+          -Xmx1g
+        dest: /etc/elasticsearch/jvm.options.d/heap.options
+        owner: root
+        group: elasticsearch
+        mode: "0644"
+
+    - name: Elasticsearch 로그 디렉토리 권한 설정
+      file:
+        path: /var/log/elasticsearch
+        owner: elasticsearch
+        group: elasticsearch
+        mode: "0755"
+        state: directory
+
+    - name: Elasticsearch 서비스 시작 및 활성화
+      systemd:
+        name: elasticsearch
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: Elasticsearch 포트 개방 대기
+      wait_for:
+        port: 9200
+        host: localhost
+        delay: 30
+        timeout: 300
+
+# 3단계: Kibana 설치
+- name: "3️⃣ Kibana 설치"
+  hosts: aws-shared-elk
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Kibana 설치
+      apt:
+        name: kibana
+        state: present
+
+    - name: Kibana 로그 디렉토리 생성
+      file:
+        path: /var/log/kibana
+        owner: kibana
+        group: kibana
+        mode: "0755"
+        state: directory
+
+    - name: Kibana 설정 파일 복사
+      copy:
+        src: "../../elk-configs/kibana/kibana-simple.yml"
+        dest: /etc/kibana/kibana.yml
+        owner: root
+        group: kibana
+        mode: "0660"
+        backup: yes
+
+    - name: Kibana 서비스 시작 및 활성화
+      systemd:
+        name: kibana
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: Kibana 포트 개방 대기
+      wait_for:
+        port: 5601
+        host: localhost
+        delay: 30
+        timeout: 300
+
+# 4단계: Logstash 설치
+- name: "4️⃣ Logstash 설치"
+  hosts: aws-shared-elk
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Logstash 설치
+      apt:
+        name: logstash
+        state: present
+
+    - name: Logstash 설정 디렉토리 생성
+      file:
+        path: /etc/logstash/conf.d
+        state: directory
+        owner: root
+        group: logstash
+        mode: "0755"
+
+    - name: Logstash 파이프라인 설정 파일 복사 (존재하는 경우)
+      copy:
+        src: "../../elk-configs/logstash/beats-input.conf"
+        dest: "/etc/logstash/conf.d/beats-input.conf"
+        owner: root
+        group: logstash
+        mode: "0644"
+        backup: yes
+      ignore_errors: yes
+
+    - name: Logstash 서비스 시작 및 활성화
+      systemd:
+        name: logstash
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+# 5단계: Nginx 리버스 프록시 설정
+- name: "5️⃣ Nginx 리버스 프록시 설정"
+  hosts: aws-shared-elk
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Nginx 설치
+      apt:
+        name: nginx
+        state: present
+
+    - name: 기존 기본 사이트 비활성화
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: ELK Nginx 설정 파일 복사
+      copy:
+        src: "../../elk-configs/nginx/elk.test.moongsan.com.conf"
+        dest: /etc/nginx/sites-available/elk.test.moongsan.com.conf
+        owner: root
+        group: root
+        mode: "0644"
+        backup: yes
+
+    - name: ELK 사이트 활성화
+      file:
+        src: /etc/nginx/sites-available/elk.test.moongsan.com.conf
+        dest: /etc/nginx/sites-enabled/elk.test.moongsan.com.conf
+        state: link
+
+    - name: Nginx 설정 문법 검사
+      command: nginx -t
+      register: nginx_syntax
+      changed_when: false
+
+    - name: Nginx 서비스 시작 및 활성화
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Nginx 포트 확인
+      wait_for:
+        port: 80
+        host: localhost
+        delay: 5
+        timeout: 30
+
+# 6단계: 배포 완료 확인
+- name: "6️⃣ 배포 완료 확인"
+  hosts: aws-shared-elk
+  gather_facts: no
+  tasks:
+    - name: Elasticsearch 상태 확인
+      uri:
+        url: "http://localhost:9200"
+        method: GET
+        timeout: 10
+      register: es_health
+
+    - name: Kibana 상태 확인
+      uri:
+        url: "http://localhost:5601/api/status"
+        method: GET
+        timeout: 10
+      register: kibana_health
+      ignore_errors: yes
+
+    - name: Nginx 상태 확인
+      uri:
+        url: "http://localhost:80"
+        method: GET
+        timeout: 10
+        follow_redirects: none
+      register: nginx_health
+      ignore_errors: yes
+
+    - name: 배포 결과 표시
+      debug:
+        msg:
+          - "✅ AWS ELK Stack 배포가 완료되었습니다!"
+          - "🔍 Elasticsearch: {{ 'OK' if es_health.status == 200 else 'FAILED' }}"
+          - "📊 Kibana: {{ 'OK' if kibana_health.status == 200 else 'FAILED' }}"
+          - "🌐 Nginx: {{ 'OK' if nginx_health.status == 302 else 'FAILED' }}"
+          - "🌍 접속 정보:"
+          - "  - 도메인 접속: http://elk.test.moongsan.com (DNS 설정 후)"
+          - "  - 직접 접속: http://43.203.65.98"
+          - "  - Elasticsearch API: http://43.203.65.98:9200"
+          - "  - Kibana Direct: http://43.203.65.98:5601"

@@ -1,0 +1,17 @@
+# =================== System: Kibana Server ===================
+# Kibana 서버 포트
+server.port: 5601
+
+# 모든 인터페이스에서 접근 허용
+server.host: "0.0.0.0"
+
+# 서버 이름
+server.name: "aws-elk-kibana"
+
+# =================== System: Elasticsearch ===================
+# Elasticsearch 연결 설정
+elasticsearch.hosts: ["http://localhost:9200"]
+
+# =================== Other ===================
+# 최대 페이로드 크기
+server.maxPayload: 1048576

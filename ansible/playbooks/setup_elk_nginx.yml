@@ -1,0 +1,55 @@
+---
+- name: "🌐 ELK Nginx 설정 배포"
+  hosts: aws-shared-elk
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: 기존 테스트 사이트 설정 제거
+      file:
+        path: /etc/nginx/sites-enabled/test.moongsan.com.conf
+        state: absent
+
+    - name: ELK Nginx 설정 파일 복사
+      copy:
+        src: "../../elk-configs/nginx/elk.test.moongsan.com.conf"
+        dest: "/etc/nginx/sites-available/elk.test.moongsan.com.conf"
+        owner: root
+        group: root
+        mode: "0644"
+        backup: yes
+
+    - name: ELK 사이트 활성화
+      file:
+        src: /etc/nginx/sites-available/elk.test.moongsan.com.conf
+        dest: /etc/nginx/sites-enabled/elk.test.moongsan.com.conf
+        state: link
+
+    - name: Nginx 설정 문법 검사
+      command: nginx -t
+      register: nginx_syntax
+      changed_when: false
+
+    - name: Nginx 재시작
+      systemd:
+        name: nginx
+        state: restarted
+
+    - name: Nginx 상태 확인
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: HTTP 포트 80 확인
+      wait_for:
+        port: 80
+        host: localhost
+        delay: 5
+        timeout: 30
+
+    - name: 설정 완료 메시지
+      debug:
+        msg:
+          - "✅ ELK Nginx 설정이 완료되었습니다!"
+          - "🌐 접속 URL: http://elk.test.moongsan.com"
+          - "📊 Kibana 대시보드에 접근할 수 있습니다."

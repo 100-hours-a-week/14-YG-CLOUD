@@ -1,0 +1,80 @@
+---
+- name: "🔐 ELK HTTPS 설정 배포"
+  hosts: aws-shared-elk
+  become: yes
+  gather_facts: yes
+  vars:
+    nginx:
+      domain: "elk.test.moongsan.com"
+      ssl_email: "admin@moongsan.com"
+
+  tasks:
+    - name: Certbot 설치
+      apt:
+        name:
+          - certbot
+          - python3-certbot-nginx
+        state: present
+        update_cache: yes
+
+    - name: 기존 Nginx 사이트 설정 백업
+      command: mv /etc/nginx/sites-available/default /etc/nginx/sites-available/default.bak
+      ignore_errors: yes
+
+    - name: ELK HTTP Nginx 설정 배포 (1단계)
+      template:
+        src: ../roles/nginx_conf/templates/nginx_elk_http.j2
+        dest: /etc/nginx/sites-available/default
+        force: yes
+        backup: yes
+        mode: "0644"
+
+    - name: Nginx 재시작 (1단계)
+      systemd:
+        name: nginx
+        state: restarted
+
+    - name: Let's Encrypt 인증서 발급
+      command: >
+        certbot --nginx -d {{ nginx.domain }} 
+        --non-interactive --agree-tos -m {{ nginx.ssl_email }}
+        --redirect
+      register: certbot_result
+      ignore_errors: yes
+
+    - name: ELK HTTPS Nginx 설정 배포 (2단계)
+      template:
+        src: ../roles/nginx_conf/templates/nginx_elk_https.j2
+        dest: /etc/nginx/sites-available/default
+        force: yes
+        mode: "0644"
+      when: certbot_result.rc == 0
+
+    - name: Nginx 최종 재시작
+      systemd:
+        name: nginx
+        state: restarted
+
+    - name: HTTPS 포트 443 확인
+      wait_for:
+        port: 443
+        host: localhost
+        delay: 5
+        timeout: 30
+      when: certbot_result.rc == 0
+
+    - name: HTTP 포트 80 확인 (리다이렉트용)
+      wait_for:
+        port: 80
+        host: localhost
+        delay: 5
+        timeout: 30
+
+    - name: 배포 완료 메시지
+      debug:
+        msg:
+          - "✅ ELK HTTPS 설정이 완료되었습니다!"
+          - "🔐 SSL 인증서: {{ 'OK' if certbot_result.rc == 0 else 'FAILED' }}"
+          - "🌐 HTTPS 접속: https://{{ nginx.domain }}"
+          - "🔗 HTTP 리다이렉트: http://{{ nginx.domain }} → https://{{ nginx.domain }}"
+          - "📊 Kibana 대시보드에 HTTPS로 안전하게 접근할 수 있습니다."

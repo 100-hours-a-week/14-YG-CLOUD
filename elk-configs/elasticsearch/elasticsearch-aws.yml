@@ -1,0 +1,43 @@
+# ======================== Elasticsearch Configuration =========================
+#
+# AWS 환경용 Elasticsearch 설정 (단순화된 버전)
+#
+# ---------------------------------- Cluster -----------------------------------
+cluster.name: moongsan-elk-cluster
+
+# ------------------------------------ Node ------------------------------------
+node.name: aws-elk-node-1
+
+# ----------------------------------- Paths ------------------------------------
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch
+
+# ----------------------------------- Memory -----------------------------------
+# 메모리 잠금 비활성화 (AWS 환경에서 문제를 일으킬 수 있음)
+bootstrap.memory_lock: false
+
+# ---------------------------------- Network -----------------------------------
+# 모든 인터페이스에서 접근 허용
+network.host: 0.0.0.0
+http.port: 9200
+
+# --------------------------------- Discovery ----------------------------------
+# 단일 노드 클러스터 설정
+discovery.type: single-node
+
+# --------------------------------- Security ---------------------------------
+# 보안 기능 비활성화 (초기 설정을 위해)
+xpack.security.enabled: false
+xpack.security.enrollment.enabled: false
+
+# HTTP SSL 비활성화
+xpack.security.http.ssl:
+  enabled: false
+
+# Transport SSL 비활성화
+xpack.security.transport.ssl:
+  enabled: false
+
+# ---------------------------------- Various -----------------------------------
+# 인덱스 삭제 허용
+action.destructive_requires_name: false
