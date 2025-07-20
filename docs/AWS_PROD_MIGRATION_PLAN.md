@@ -18,12 +18,55 @@
 
 ## 🏗️ AWS Prod 아키텍처 설계
 
-### 네트워크 구성 (최소 구성)
+### 네트워크 아키텍처 설계 방침
+
+#### 3-Tier 아키텍처 옵션 분석
+
+AWS 3-Tier 아키텍처 구현에 대한 세 가지 접근 방식을 비교 분석하여 최적의 솔루션을 선택합니다.
+
+##### Option 1: 완전한 엔터프라이즈 3-Tier 아키텍처 ⭐️⭐️⭐️⭐️⭐️
 ```
 AWS Prod VPC (10.2.0.0/16)
 ├── Public Subnet (10.2.1.0/24) - ap-northeast-2a
 │   ├── Application Load Balancer
-│   └── NAT Gateway
+│   └── NAT Gateway #1
+├── Public Subnet (10.2.4.0/24) - ap-northeast-2c  
+│   └── NAT Gateway #2
+├── Private Subnet (10.2.2.0/24) - ap-northeast-2a
+│   ├── Backend API Server (EC2)
+│   ├── AI Service Server (EC2) - GPU
+│   ├── Redis Server (EC2) - Cache
+│   └── Kafka Cluster (EC2) - Message Queue
+├── Private Subnet (10.2.5.0/24) - ap-northeast-2c
+│   └── (확장용 Private Subnet)
+├── Database Subnet (10.2.3.0/24) - ap-northeast-2a
+│   ├── Database Server (EC2) - MySQL
+│   └── Vector DB Server (EC2) - PostgreSQL + pgvector
+└── Database Subnet (10.2.6.0/24) - ap-northeast-2c
+    └── (확장용 Database Subnet)
+```
+
+**장점:**
+- 완전한 고가용성 (Multi-AZ)
+- 단일 장애점 없음 (NAT Gateway 이중화)
+- 엔터프라이즈 표준 준수
+- 향후 확장성 우수
+
+**단점:**
+- 높은 비용 (NAT Gateway 2개: $90/월)
+- 복잡한 관리
+- 현재 트래픽 대비 과도한 스펙
+
+**예상 비용:** $420-450/월
+
+##### Option 2: 비용 최적화 3-Tier 아키텍처 ⭐️⭐️⭐️⭐️ (🎯 **권장**)
+```
+AWS Prod VPC (10.2.0.0/16)
+├── Public Subnet (10.2.1.0/24) - ap-northeast-2a
+│   ├── Application Load Balancer (Multi-AZ 지원)
+│   └── NAT Gateway (단일, 공유)
+├── Public Subnet (10.2.4.0/24) - ap-northeast-2c
+│   └── (ALB용 추가 서브넷, NAT 없음)
 ├── Private Subnet (10.2.2.0/24) - ap-northeast-2a
 │   ├── Backend API Server (EC2)
 │   ├── AI Service Server (EC2) - GPU
@@ -34,24 +77,111 @@ AWS Prod VPC (10.2.0.0/16)
     └── Vector DB Server (EC2) - PostgreSQL + pgvector
 ```
 
-**최소 구성 장점**:
-- 네트워크 지연 최소화 (모든 서비스가 같은 AZ)
-- 관리 복잡성 최소화
-- 비용 효율성 (NAT Gateway 1개, 인스턴스 최소화)
-- 빠른 구축 및 테스트 가능
+**장점:**
+- 3-Tier 구조 유지 (업계 표준)
+- 적절한 보안 격리
+- 합리적인 비용 (NAT Gateway 1개: $45/월)
+- ALB Multi-AZ로 웹 계층 고가용성 확보
+- DB와 Private 계층 분리로 보안성 확보
 
-### 서비스 매핑 (최소 구성)
+**단점:**
+- NAT Gateway 단일 장애점 (99.95% 가용성)
+- Private/DB 서브넷이 같은 AZ
+
+**예상 비용:** $280-320/월
+
+##### Option 3: 단순화된 2-Tier 아키텍처 ⭐️⭐️⭐️
+```
+AWS Prod VPC (10.2.0.0/16)
+├── Public Subnet (10.2.1.0/24) - ap-northeast-2a
+│   ├── Application Load Balancer
+│   └── NAT Gateway
+└── Private Subnet (10.2.2.0/24) - ap-northeast-2a
+    ├── Backend API Server (EC2)
+    ├── AI Service Server (EC2) - GPU
+    ├── Database Server (EC2) - MySQL
+    ├── Vector DB Server (EC2) - PostgreSQL + pgvector
+    ├── Redis Server (EC2) - Cache
+    └── Kafka Cluster (EC2) - Message Queue
+```
+
+**장점:**
+- 최소 비용
+- 단순한 관리
+- 빠른 구축
+
+**단점:**
+- 보안 격리 부족 (DB와 App이 같은 서브넷)
+- 3-Tier 표준 미준수
+- 확장성 제한
+
+**예상 비용:** $250-280/월
+
+#### 🎯 **최종 권장: Option 2 (비용 최적화 3-Tier)**
+
+**선택 이유:**
+1. **표준 준수**: 3-Tier 아키텍처 유지로 업계 모범사례 준수
+2. **적절한 보안**: DB와 Application 계층 분리
+3. **비용 효율성**: 완전한 엔터프라이즈 대비 30% 비용 절감
+4. **확장 가능성**: 향후 Multi-AZ 확장 시 쉬운 전환
+5. **운영 신뢰성**: ALB Multi-AZ로 웹 계층 고가용성 확보
+
+**위험 완화 방안:**
+- NAT Gateway 모니터링 강화 (CloudWatch 알람)
+- NAT Instance 백업 계획 수립
+- 향후 트래픽 증가 시 NAT Gateway 이중화 검토
+
+### 선택된 네트워크 구성 (Option 2 - 단순화)
+```
+AWS Prod VPC (10.2.0.0/16)
+├── Public Subnet (10.2.1.0/24) - ap-northeast-2a
+│   ├── Application Load Balancer
+│   └── NAT Gateway (공유)
+├── Private Subnet (10.2.2.0/24) - ap-northeast-2a
+│   ├── Backend API Server (EC2)
+│   ├── AI Model Server (EC2) - GPU (학습/추론)
+│   ├── AI Serving Server A (EC2) - FastAPI (기능 A)
+│   ├── AI Serving Server B (EC2) - FastAPI (기능 B)
+│   ├── Redis Server (EC2) - Cache
+│   └── Kafka Cluster (EC2) - Message Queue
+└── Database Subnet (10.2.3.0/24) - ap-northeast-2a
+    ├── Database Server (EC2) - MySQL
+    ├── Vector DB Server (EC2) - PostgreSQL + pgvector
+    └── MongoDB Server (EC2) - NoSQL Database
+```
+
+**핵심 설계 원칙:**
+- **3-Tier 분리**: Web(Public) → App(Private) → DB(Database) 계층 구분
+- **보안 격리**: 각 계층별 별도 서브넷 및 보안그룹
+- **비용 최적화**: 단일 NAT Gateway로 외부 통신 제공
+- **확장성**: 필요시 Multi-AZ 확장 준비된 구조
+- **MongoDB 포함**: 모든 데이터베이스를 Database 서브넷에서 통합 관리
+
+### 서비스 매핑 (AI 기능별 분리)
 | GCP 서비스 | AWS 대응 서비스 | 인스턴스 타입 | 가용영역 | 용도 |
 |------------|-----------------|---------------|----------|------|
 | prod-backend | EC2 t3.medium × 1 | 2 vCPU, 4GB | ap-northeast-2a | Spring Boot API |
-| prod-ai | EC2 g4dn.xlarge × 1 | 4 vCPU, 16GB, GPU | ap-northeast-2a | FastAPI + ML Models |
+| prod-ai-model | EC2 g4dn.xlarge × 1 | 4 vCPU, 16GB, GPU | ap-northeast-2a | ML Model Server (학습/추론) |
+| prod-ai-serving-a | EC2 t3.medium × 1 | 2 vCPU, 4GB | ap-northeast-2a | FastAPI Serving (기능 A) |
+| prod-ai-serving-b | EC2 t3.medium × 1 | 2 vCPU, 4GB | ap-northeast-2a | FastAPI Serving (기능 B) |
 | prod-database | EC2 t3.small × 1 | 2 vCPU, 2GB | ap-northeast-2a | MySQL 8.0 |
 | prod-vectordb | EC2 t3.small × 1 | 2 vCPU, 2GB | ap-northeast-2a | PostgreSQL + pgvector |
+| prod-mongodb | EC2 t3.small × 1 | 2 vCPU, 2GB | ap-northeast-2a | MongoDB NoSQL |
 | prod-redis | EC2 t3.micro × 1 | 2 vCPU, 1GB | ap-northeast-2a | Redis Cache |
-| prod-kafka | EC2 t3.medium × 1 | 2 vCPU, 4GB | ap-northeast-2a | Kafka Message Queue |
+| prod-kafka | EC2 t3.medium × 1 | 2 vCPU, 4GB | ap-northeast-2a | Kafka 3 + Zookeeper 3 + UI |
 | GCS + CDN | S3 + CloudFront | - | Multi-Region | 정적 웹사이트 |
 
-**총 인스턴스**: 6대 (모두 ap-northeast-2a)
+**총 인스턴스**: 9대 (모두 ap-northeast-2a)
+
+#### Kafka 클러스터 구성 상세
+```
+단일 EC2 인스턴스에서 Docker Compose로 운영:
+- Zookeeper 3대: 포트 2181, 2182, 2183
+- Kafka 3대: 포트 19092, 19093, 19094 (External)
+- Kafka UI: 포트 8089 (관리용)
+- 내부 통신: 포트 9092 (Kafka), 2888-3888 (Zookeeper)
+- 복제 팩터: 3 (고가용성 보장)
+```
 
 ## 🚀 마이그레이션 단계별 계획
 
@@ -108,6 +238,11 @@ VPC → 서브넷 → "서브넷 생성" 클릭
   * Name: aws-prod-database-subnet
   * Type: database
   * Environment: prod
+
+주의사항:
+- Public 서브넷은 향후 확장시 추가 AZ 구성 가능
+- 현재는 단일 AZ로 시작하여 복잡성 최소화
+- ALB는 단일 서브넷에서도 정상 동작 (Multi-AZ는 향후 확장시 고려)
 ```
 
 ##### 1-3. Internet Gateway 생성 및 연결
@@ -213,6 +348,24 @@ Private/Database 서브넷:
 - 자동 IP 할당 비활성화 (기본값 유지)
 ```
 
+**자동 IP 할당 활성화의 장점:**
+- **편의성**: EC2 인스턴스 생성 시 자동으로 퍼블릭 IP 할당 (인스턴스용)
+- **운영 효율성**: Public 서브넷의 EC2 인스턴스가 외부 통신 가능
+- **비용 절약**: 탄력적 IP(EIP) 할당 없이도 외부 접근 가능 (단, 인스턴스 재시작 시 IP 변경)
+- **자동화**: Auto Scaling 시 새 인스턴스에 자동으로 퍼블릭 IP 부여
+- **보안**: Private/Database 서브넷은 비활성화하여 외부 직접 접근 차단
+
+**중요 사항:**
+- **ALB는 영향 없음**: ALB는 고정 DNS 이름 사용, Route 53 별칭으로 연결
+- **자동 IP 할당**: EC2 인스턴스에만 적용, ALB나 NAT Gateway와 무관
+- **DNS 안정성**: api.test.moongsan.com → ALB DNS 별칭 → AWS가 자동 관리
+
+**주의사항:**
+- 자동 할당된 퍼블릭 IP는 EC2 인스턴스 중지/시작 시 변경됨
+- 고정 IP가 필요한 EC2는 탄력적 IP(EIP) 별도 할당 필요  
+- Private/Database 서브넷에서는 보안상 비활성화 권장
+- **ALB/NAT Gateway**: 별도의 고정 IP/DNS 사용으로 영향 없음
+
 #### Step 1.2: 보안 그룹 설정 (상세 가이드)
 
 ```
@@ -244,6 +397,9 @@ EC2 → 네트워크 및 보안 → 보안 그룹 → "보안 그룹 생성"
 아웃바운드 규칙:
 - 기본값 유지 (모든 트래픽 허용)
 
+접속 흐름:
+- Internet → ALB (:80, :443)
+
 태그:
 - Name: aws-prod-alb-sg
 - Environment: prod
@@ -272,17 +428,21 @@ EC2 → 네트워크 및 보안 → 보안 그룹 → "보안 그룹 생성"
 - 소스: 10.2.0.0/16 (VPC CIDR)
 - 설명: SSH from VPC
 
+접속 흐름:
+- ALB → Backend (:8080)
+- VPC → Backend (:22)
+
 태그:
 - Name: aws-prod-backend-sg
 - Environment: prod
 - Service: backend
 ```
 
-##### SG 3: AI Service Security Group
+##### SG 3: AI Model Server Security Group
 ```
 기본 정보:
-- 보안 그룹 이름: aws-prod-ai-sg
-- 설명: Production AI Service Security Group
+- 보안 그룹 이름: aws-prod-ai-model-sg
+- 설명: Production AI Model Server Security Group (GPU)
 - VPC: aws-prod-vpc
 
 인바운드 규칙:
@@ -290,8 +450,8 @@ EC2 → 네트워크 및 보안 → 보안 그룹 → "보안 그룹 생성"
 - 유형: 사용자 지정 TCP
 - 프로토콜: TCP
 - 포트 범위: 8000
-- 소스: aws-prod-backend-sg (보안 그룹 선택)
-- 설명: Allow Backend to AI Service
+- 소스: aws-prod-ai-serving-sg (보안 그룹 선택)
+- 설명: Allow AI Serving to Model Server
 
 규칙 2:
 - 유형: SSH
@@ -300,13 +460,71 @@ EC2 → 네트워크 및 보안 → 보안 그룹 → "보안 그룹 생성"
 - 소스: 10.2.0.0/16
 - 설명: SSH from VPC
 
+접속 흐름:
+- AI Serving → AI Model (:8000)
+- VPC → AI Model (:22)
+
 태그:
-- Name: aws-prod-ai-sg
+- Name: aws-prod-ai-model-sg
 - Environment: prod
-- Service: ai
+- Service: ai-model
 ```
 
-##### SG 4: Database Security Group
+##### SG 4: AI Serving Security Group
+```
+기본 정보:
+- 보안 그룹 이름: aws-prod-ai-serving-sg
+- 설명: Production AI Serving API Security Group (기능별)
+- VPC: aws-prod-vpc
+
+인바운드 규칙:
+규칙 1:
+- 유형: 사용자 지정 TCP
+- 프로토콜: TCP
+- 포트 범위: 8100
+- 소스: aws-prod-backend-sg (보안 그룹 선택)
+- 설명: Allow Backend to AI Serving A (기능 A)
+
+규칙 2:
+- 유형: 사용자 지정 TCP
+- 프로토콜: TCP
+- 포트 범위: 8101
+- 소스: aws-prod-backend-sg (보안 그룹 선택)
+- 설명: Allow Backend to AI Serving B (기능 B)
+
+규칙 3:
+- 유형: 사용자 지정 TCP
+- 프로토콜: TCP
+- 포트 범위: 8100
+- 소스: aws-prod-alb-sg (보안 그룹 선택)
+- 설명: Allow ALB to AI Serving A (직접 접근)
+
+규칙 4:
+- 유형: 사용자 지정 TCP
+- 프로토콜: TCP
+- 포트 범위: 8101
+- 소스: aws-prod-alb-sg (보안 그룹 선택)
+- 설명: Allow ALB to AI Serving B (직접 접근)
+
+규칙 5:
+- 유형: SSH
+- 프로토콜: TCP
+- 포트 범위: 22
+- 소스: 10.2.0.0/16
+- 설명: SSH from VPC
+
+접속 흐름:
+- Backend → AI Serving (:8100, :8101)
+- ALB → AI Serving (:8100, :8101) [직접 접근]
+- VPC → AI Serving (:22)
+
+태그:
+- Name: aws-prod-ai-serving-sg
+- Environment: prod
+- Service: ai-serving
+```
+
+##### SG 5: Database Security Group
 ```
 기본 정보:
 - 보안 그룹 이름: aws-prod-database-sg
@@ -325,8 +543,8 @@ EC2 → 네트워크 및 보안 → 보안 그룹 → "보안 그룹 생성"
 - 유형: MySQL/Aurora
 - 프로토콜: TCP
 - 포트 범위: 3306
-- 소스: aws-prod-ai-sg
-- 설명: Allow AI Service to MySQL
+- 소스: aws-prod-ai-serving-sg
+- 설명: Allow AI Serving to MySQL
 
 규칙 3:
 - 유형: SSH
@@ -335,13 +553,18 @@ EC2 → 네트워크 및 보안 → 보안 그룹 → "보안 그룹 생성"
 - 소스: 10.2.0.0/16
 - 설명: SSH from VPC
 
+접속 흐름:
+- Backend → MySQL (:3306)
+- AI Serving → MySQL (:3306)
+- VPC → MySQL (:22)
+
 태그:
 - Name: aws-prod-database-sg
 - Environment: prod
 - Service: mysql
 ```
 
-##### SG 5: Vector DB Security Group
+##### SG 6: Vector DB Security Group
 ```
 기본 정보:
 - 보안 그룹 이름: aws-prod-vectordb-sg
@@ -353,8 +576,8 @@ EC2 → 네트워크 및 보안 → 보안 그룹 → "보안 그룹 생성"
 - 유형: PostgreSQL
 - 프로토콜: TCP
 - 포트 범위: 5432
-- 소스: aws-prod-ai-sg
-- 설명: Allow AI Service to Vector DB
+- 소스: aws-prod-ai-serving-sg
+- 설명: Allow AI Serving to Vector DB
 
 규칙 2:
 - 유형: SSH
@@ -363,13 +586,57 @@ EC2 → 네트워크 및 보안 → 보안 그룹 → "보안 그룹 생성"
 - 소스: 10.2.0.0/16
 - 설명: SSH from VPC
 
+접속 흐름:
+- AI Serving → Vector DB (:5432)
+- VPC → Vector DB (:22)
+
 태그:
 - Name: aws-prod-vectordb-sg
 - Environment: prod
 - Service: postgresql
 ```
 
-##### SG 6: Redis Security Group
+##### SG 7: MongoDB Security Group
+```
+기본 정보:
+- 보안 그룹 이름: aws-prod-mongodb-sg
+- 설명: Production MongoDB NoSQL Database Security Group
+- VPC: aws-prod-vpc
+
+인바운드 규칙:
+규칙 1:
+- 유형: 사용자 지정 TCP
+- 프로토콜: TCP
+- 포트 범위: 27017
+- 소스: aws-prod-backend-sg
+- 설명: Allow Backend to MongoDB
+
+규칙 2:
+- 유형: 사용자 지정 TCP
+- 프로토콜: TCP
+- 포트 범위: 27017
+- 소스: aws-prod-ai-serving-sg
+- 설명: Allow AI Serving to MongoDB
+
+규칙 3:
+- 유형: SSH
+- 프로토콜: TCP
+- 포트 범위: 22
+- 소스: 10.2.0.0/16
+- 설명: SSH from VPC
+
+접속 흐름:
+- Backend → MongoDB (:27017)
+- AI Serving → MongoDB (:27017)
+- VPC → MongoDB (:22)
+
+태그:
+- Name: aws-prod-mongodb-sg
+- Environment: prod
+- Service: mongodb
+```
+
+##### SG 8: Redis Security Group
 ```
 기본 정보:
 - 보안 그룹 이름: aws-prod-redis-sg
@@ -385,11 +652,23 @@ EC2 → 네트워크 및 보안 → 보안 그룹 → "보안 그룹 생성"
 - 설명: Allow Backend to Redis
 
 규칙 2:
+- 유형: 사용자 지정 TCP
+- 프로토콜: TCP
+- 포트 범위: 6379
+- 소스: aws-prod-ai-serving-sg
+- 설명: Allow AI Serving to Redis
+
+규칙 3:
 - 유형: SSH
 - 프로토콜: TCP
 - 포트 범위: 22
 - 소스: 10.2.0.0/16
 - 설명: SSH from VPC
+
+접속 흐름:
+- Backend → Redis (:6379)
+- AI Serving → Redis (:6379)
+- VPC → Redis (:22)
 
 태그:
 - Name: aws-prod-redis-sg
@@ -397,11 +676,11 @@ EC2 → 네트워크 및 보안 → 보안 그룹 → "보안 그룹 생성"
 - Service: redis
 ```
 
-##### SG 7: Kafka Security Group
+##### SG 9: Kafka Security Group
 ```
 기본 정보:
 - 보안 그룹 이름: aws-prod-kafka-sg
-- 설명: Production Kafka Message Queue Security Group
+- 설명: Production Kafka Cluster + Zookeeper Security Group
 - VPC: aws-prod-vpc
 
 인바운드 규칙:
@@ -410,40 +689,64 @@ EC2 → 네트워크 및 보안 → 보안 그룹 → "보안 그룹 생성"
 - 프로토콜: TCP
 - 포트 범위: 9092
 - 소스: aws-prod-backend-sg
-- 설명: Allow Backend to Kafka
+- 설명: Allow Backend to Kafka (Internal)
 
 규칙 2:
 - 유형: 사용자 지정 TCP
 - 프로토콜: TCP
 - 포트 범위: 9092
-- 소스: aws-prod-ai-sg
-- 설명: Allow AI Service to Kafka
+- 소스: aws-prod-ai-serving-sg
+- 설명: Allow AI Serving to Kafka (Internal)
 
 규칙 3:
 - 유형: 사용자 지정 TCP
 - 프로토콜: TCP
-- 포트 범위: 2181
+- 포트 범위: 2181-2183
 - 소스: aws-prod-backend-sg
-- 설명: Allow Backend to Zookeeper
+- 설명: Allow Backend to Zookeeper Cluster
 
 규칙 4:
 - 유형: 사용자 지정 TCP
 - 프로토콜: TCP
-- 포트 범위: 2181
-- 소스: aws-prod-ai-sg
-- 설명: Allow AI Service to Zookeeper
+- 포트 범위: 2181-2183
+- 소스: aws-prod-ai-serving-sg
+- 설명: Allow AI Serving to Zookeeper Cluster
 
 규칙 5:
+- 유형: 사용자 지정 TCP
+- 프로토콜: TCP
+- 포트 범위: 19092-19094
+- 소스: 10.2.0.0/16
+- 설명: Allow VPC to Kafka External Ports
+
+규칙 6:
+- 유형: 사용자 지정 TCP
+- 프로토콜: TCP
+- 포트 범위: 8089
+- 소스: 10.2.0.0/16
+- 설명: Allow VPC to Kafka UI
+
+규칙 7:
 - 유형: SSH
 - 프로토콜: TCP
 - 포트 범위: 22
 - 소스: 10.2.0.0/16
 - 설명: SSH from VPC
 
+접속 흐름:
+- Backend → Kafka (:9092)
+- AI Serving → Kafka (:9092)
+- Backend → Zookeeper (:2181-2183)
+- AI Serving → Zookeeper (:2181-2183)
+- VPC → Kafka External (:19092-19094)
+- VPC → Kafka UI (:8089)
+- VPC → Kafka (:22)
+- 📝 참고: Zookeeper 내부 클러스터링(:2888-3888)은 컨테이너 내부 통신으로 보안그룹 규칙 불필요
+
 태그:
 - Name: aws-prod-kafka-sg
 - Environment: prod
-- Service: kafka
+- Service: kafka-cluster
 ```
 
 #### Step 1.3: EC2 인스턴스 생성 (상세 가이드)
@@ -482,7 +785,7 @@ EC2 → 인스턴스 → "인스턴스 시작"
    - Backup: true
 ```
 
-##### 인스턴스 2: AI Service Server (GPU)
+##### 인스턴스 2: AI Model Server (GPU)
 ```
 1. AMI 선택:
    - Deep Learning AMI (Ubuntu 20.04) Version XX.X
@@ -492,26 +795,83 @@ EC2 → 인스턴스 → "인스턴스 시작"
    - g4dn.xlarge (4 vCPU, 16 GiB RAM, 1 NVIDIA T4 GPU)
 
 3. 키 페어:
-   - aws-prod-ai-key (새로 생성 또는 기존 사용)
+   - aws-prod-ai-model-key (새로 생성 또는 기존 사용)
 
 4. 네트워크 설정:
    - VPC: aws-prod-vpc
    - 서브넷: aws-prod-private-subnet
    - 퍼블릭 IP 자동 할당: 비활성화
-   - 보안 그룹: aws-prod-ai-sg 선택
+   - 보안 그룹: aws-prod-ai-model-sg 선택
 
 5. 스토리지 구성:
    - 50 GiB gp3 (루트 볼륨) - AI 모델용 추가 공간
+   - 추가 EBS 볼륨: 100 GiB gp3 (모델 저장용)
    - 암호화 활성화
 
 6. 태그:
-   - Name: aws-prod-ai
+   - Name: aws-prod-ai-model
    - Environment: prod
-   - Service: ai
+   - Service: ai-model
    - Instance-Type: gpu
 ```
 
-##### 인스턴스 3: MySQL Database Server
+##### 인스턴스 3: AI Serving Server A (기능 A)
+```
+1. AMI 선택:
+   - Amazon Linux 2023 AMI
+
+2. 인스턴스 유형:
+   - t3.medium (2 vCPU, 4 GiB RAM)
+
+3. 키 페어:
+   - aws-prod-ai-serving-key
+
+4. 네트워크 설정:
+   - VPC: aws-prod-vpc
+   - 서브넷: aws-prod-private-subnet
+   - 퍼블릭 IP 자동 할당: 비활성화
+   - 보안 그룹: aws-prod-ai-serving-sg 선택
+
+5. 스토리지 구성:
+   - 20 GiB gp3 (루트 볼륨)
+   - 암호화 활성화
+
+6. 태그:
+   - Name: aws-prod-ai-serving-a
+   - Environment: prod
+   - Service: ai-serving
+   - Function: feature-a
+```
+
+##### 인스턴스 4: AI Serving Server B (기능 B)
+```
+1. AMI 선택:
+   - Amazon Linux 2023 AMI
+
+2. 인스턴스 유형:
+   - t3.medium (2 vCPU, 4 GiB RAM)
+
+3. 키 페어:
+   - aws-prod-ai-serving-key (동일 키 사용)
+
+4. 네트워크 설정:
+   - VPC: aws-prod-vpc
+   - 서브넷: aws-prod-private-subnet
+   - 퍼블릭 IP 자동 할당: 비활성화
+   - 보안 그룹: aws-prod-ai-serving-sg 선택
+
+5. 스토리지 구성:
+   - 20 GiB gp3 (루트 볼륨)
+   - 암호화 활성화
+
+6. 태그:
+   - Name: aws-prod-ai-serving-b
+   - Environment: prod
+   - Service: ai-serving
+   - Function: feature-b
+```
+
+##### 인스턴스 5: MySQL Database Server
 ```
 1. AMI 선택:
    - Amazon Linux 2023 AMI
@@ -540,7 +900,7 @@ EC2 → 인스턴스 → "인스턴스 시작"
    - Backup: true
 ```
 
-##### 인스턴스 4: PostgreSQL Vector DB Server
+##### 인스턴스 6: PostgreSQL Vector DB Server
 ```
 1. AMI 선택:
    - Amazon Linux 2023 AMI
@@ -569,7 +929,36 @@ EC2 → 인스턴스 → "인스턴스 시작"
    - Vector-Extension: pgvector
 ```
 
-##### 인스턴스 5: Redis Server
+##### 인스턴스 7: MongoDB Server
+```
+1. AMI 선택:
+   - Amazon Linux 2023 AMI
+
+2. 인스턴스 유형:
+   - t3.small (2 vCPU, 2 GiB RAM)
+
+3. 키 페어:
+   - aws-prod-mongodb-key
+
+4. 네트워크 설정:
+   - VPC: aws-prod-vpc
+   - 서브넷: aws-prod-database-subnet
+   - 퍼블릭 IP 자동 할당: 비활성화
+   - 보안 그룹: aws-prod-mongodb-sg 선택
+
+5. 스토리지 구성:
+   - 20 GiB gp3 (루트 볼륨)
+   - 추가 EBS 볼륨: 30 GiB gp3 (MongoDB 데이터용)
+   - 암호화 활성화
+
+6. 태그:
+   - Name: aws-prod-mongodb
+   - Environment: prod
+   - Service: mongodb
+   - Database-Type: nosql
+```
+
+##### 인스턴스 8: Redis Server
 ```
 1. AMI 선택:
    - Amazon Linux 2023 AMI
@@ -597,7 +986,35 @@ EC2 → 인스턴스 → "인스턴스 시작"
    - Cache: true
 ```
 
-##### 인스턴스 6: Kafka Server
+##### 인스턴스 6: Redis Server
+```
+1. AMI 선택:
+   - Amazon Linux 2023 AMI
+
+2. 인스턴스 유형:
+   - t3.micro (1 vCPU, 1 GiB RAM)
+
+3. 키 페어:
+   - aws-prod-redis-key
+
+4. 네트워크 설정:
+   - VPC: aws-prod-vpc
+   - 서브넷: aws-prod-private-subnet
+   - 퍼블릭 IP 자동 할당: 비활성화
+   - 보안 그룹: aws-prod-redis-sg 선택
+
+5. 스토리지 구성:
+   - 10 GiB gp3 (루트 볼륨)
+   - 암호화 활성화
+
+6. 태그:
+   - Name: aws-prod-redis
+   - Environment: prod
+   - Service: redis
+   - Cache: true
+```
+
+##### 인스턴스 9: Kafka Server
 ```
 1. AMI 선택:
    - Amazon Linux 2023 AMI
@@ -655,7 +1072,10 @@ EC2 → 로드 밸런싱 → 로드 밸런서 → "로드 밸런서 생성"
    - VPC: aws-prod-vpc
    - 가용 영역 및 서브넷:
      - ap-northeast-2a: aws-prod-public-subnet 선택
-     - ap-northeast-2c: (추가 퍼블릭 서브넷 필요시)
+   
+   주의사항:
+   - ALB는 최소 2개 AZ 권장하지만, 단일 AZ로도 운영 가능
+   - 향후 고가용성 필요시 ap-northeast-2c에 추가 퍼블릭 서브넷 생성
 
 4. 보안 그룹:
    - aws-prod-alb-sg 선택 (기본 제거)
@@ -712,6 +1132,56 @@ EC2 → 로드 밸런싱 → 로드 밸런서 → "로드 밸런서 생성"
    - Deployment: green
 ```
 
+**AI 서빙 A 타겟 그룹:**
+```
+1. 기본 구성:
+   - 타겟 유형: 인스턴스
+   - 타겟 그룹 이름: aws-prod-ai-serving-a-tg
+   - 프로토콜: HTTP
+   - 포트: 8100
+   - VPC: aws-prod-vpc
+
+2. 상태 확인:
+   - 상태 확인 경로: /health
+   - 고급 상태 확인 설정:
+     - 포트: 트래픽 포트
+     - 정상 임계값: 2
+     - 비정상 임계값: 2
+     - 제한 시간: 5초
+     - 간격: 30초
+     - 성공 코드: 200
+
+3. 태그:
+   - Name: aws-prod-ai-serving-a-tg
+   - Environment: prod
+   - Service: ai-serving-a
+```
+
+**AI 서빙 B 타겟 그룹:**
+```
+1. 기본 구성:
+   - 타겟 유형: 인스턴스
+   - 타겟 그룹 이름: aws-prod-ai-serving-b-tg
+   - 프로토콜: HTTP
+   - 포트: 8101
+   - VPC: aws-prod-vpc
+
+2. 상태 확인:
+   - 상태 확인 경로: /health
+   - 고급 상태 확인 설정:
+     - 포트: 트래픽 포트
+     - 정상 임계값: 2
+     - 비정상 임계값: 2
+     - 제한 시간: 5초
+     - 간격: 30초
+     - 성공 코드: 200
+
+3. 태그:
+   - Name: aws-prod-ai-serving-b-tg
+   - Environment: prod
+   - Service: ai-serving-b
+```
+
 ##### 리스너 및 규칙 구성
 ```
 1. HTTP 리스너 (포트 80):
@@ -731,9 +1201,21 @@ EC2 → 로드 밸런싱 → 로드 밸런서 → "로드 밸런서 생성"
    기본 작업:
    - 대상 그룹으로 전달: aws-prod-backend-blue-tg
    
-   규칙 추가:
-   - IF: 호스트 헤더가 api.test.moongsan.com과 일치
-   - THEN: aws-prod-backend-blue-tg로 전달
+   규칙 추가 (우선순위 순):
+   - 규칙 1 (우선순위: 1):
+     - IF: 경로가 /ai/serving-a/* 와 일치
+     - THEN: aws-prod-ai-serving-a-tg로 전달
+   
+   - 규칙 2 (우선순위: 2):
+     - IF: 경로가 /ai/serving-b/* 와 일치
+     - THEN: aws-prod-ai-serving-b-tg로 전달
+   
+   - 규칙 3 (우선순위: 3):
+     - IF: 경로가 /api/* 와 일치
+     - THEN: aws-prod-backend-blue-tg로 전달
+   
+   - 기본 규칙:
+     - 모든 기타 요청 → aws-prod-backend-blue-tg로 전달
 ```
 
 ##### SSL 인증서 설정 (ACM)
@@ -768,6 +1250,12 @@ A 레코드 생성:
   - 로드 밸런서: aws-prod-alb 선택
 
 라우팅 정책: 단순 라우팅
+
+경로 기반 라우팅 구조:
+- api.test.moongsan.com/api/*          → Backend API
+- api.test.moongsan.com/ai/serving-a/* → AI Serving A (기능 A)
+- api.test.moongsan.com/ai/serving-b/* → AI Serving B (기능 B)
+- api.test.moongsan.com/*              → Backend (기본값)
 ```
 
 ##### ALB 설정 완료 후 확인사항:
@@ -1005,6 +1493,41 @@ CloudWatch → 알람 → "알람 생성"
 6. 예상 비용 절감 효과: 약 40% (16시간 가동 vs 24시간)
 ```
 
+### Step 1.6: 운영체제(OS) 선정: Amazon Linux 2023
+
+**최종 결정**: **Amazon Linux 2023**
+
+기존 GCP 환경에서는 Ubuntu를 사용해왔으나, AWS로의 완전한 통합과 장기적인 운영 효율성을 극대화하기 위해 AWS 네이티브 OS인 Amazon Linux 2023을 표준 운영체제로 선정합니다.
+
+#### Amazon Linux 선택의 트레이드오프 분석
+
+| 비교 기준 | **Amazon Linux (채택)** | **Ubuntu (기존 방식)** |
+| :--- | :--- | :--- |
+| **AWS 통합 및 최적화** | **최상**<br>• AWS 서비스와 완벽 통합<br>• 성능 및 보안 최적화<br>• AWS 도구 기본 내장 | **좋음**<br>• AWS에서 완벽히 지원<br>• 대부분의 경우 성능 차이 미미 |
+| **유지보수 및 지원** | **AWS에서 직접 지원**<br>• 신속한 보안 패치<br>• 라이브 패칭 등 최신 기능 | **Canonical에서 장기 지원**<br>• 검증된 업데이트 주기<br>• 풍부한 커뮤니티 |
+| **Ansible 호환성** | **수정 필요**<br>• `apt` → `yum`/`dnf` 전환<br>• 사용자, 패키지명 변경 | **매우 높음**<br>• 기존 스크립트 재사용 가능<br>• 마이그레이션 속도 빠름 |
+
+#### 선택 이유
+- **장기적 이점**: 초기 Ansible 스크립트 수정 비용을 감수하더라도, 장기적으로 AWS 환경에 최적화된 OS를 사용하는 것이 운영 효율성, 보안, 성능 면에서 더 큰 이점을 가져다줄 것으로 판단됩니다.
+- **AWS 네이티브**: AWS의 새로운 기능이나 서비스가 출시될 때 가장 빠르고 안정적으로 지원받을 수 있습니다.
+- **기술 부채 감소**: 클라우드 환경에 종속적인 기술 스택을 적극적으로 채택하여, 특정 OS나 버전에 얽매이지 않고 유연성을 확보합니다.
+
+#### 후속 조치: Ansible 스크립트 수정 계획
+Amazon Linux 환경에 맞춰 기존 Ansible 역할을 수정하는 작업이 필요합니다.
+
+- **담당**: AI (스크립트 분석 및 수정)
+- **주요 수정 대상**:
+  - `common`, `base_system` 등 공통 역할
+  - `nginx_conf`, `jenkins`, `database` 등 서비스별 역할
+- **수정 내용**:
+  1. **패키지 매니저 변경**: `apt` 모듈을 `yum` 또는 `dnf` 모듈로 교체
+  2. **패키지 이름 확인**: `nginx`, `python3-pip` 등 패키지 이름이 Amazon Linux 저장소에 맞게 되어 있는지 확인 및 수정
+  3. **사용자 및 그룹 변경**: `ubuntu` 사용자를 `ec2-user`로 변경
+  4. **서비스 관리**: `systemctl` 명령어 및 서비스 이름 확인
+  5. **경로 수정**: 설정 파일 및 로그 경로 등 OS에 따라 달라질 수 있는 부분 확인
+
+---
+
 ### Phase 2: 애플리케이션 배포 (Ansible 자동화)
 **담당**: AI (Ansible 플레이북 개발 및 실행)
 
@@ -1184,18 +1707,18 @@ def lambda_handler(event, context):
 
 #### 기본 운영 (24시간)
 ```
-월 비용: $350
-일 비용: $11.67
-시간당: $0.49
+월 비용: $320
+일 비용: $10.67
+시간당: $0.44
 ```
 
 #### 스케줄링 운영 (16시간/일)
 ```
-종료 대상 서버 비용: $195/월 (Backend + AI + Kafka + Redis)
-8시간 종료 절약: $195 × (8/24) = $65/월
+종료 대상 서버 비용: $185/월 (Backend + AI + Kafka + Redis)
+8시간 종료 절약: $185 × (8/24) = $62/월
 
-최종 월 비용: $350 - $65 = $285/월
-절약률: 18.5%
+최종 월 비용: $320 - $62 = $258/월
+절약률: 19.4%
 ```
 
 ### 무중단 배포를 위한 추가 리소스
@@ -1212,11 +1735,11 @@ Blue Environment (임시):
 
 #### 최종 비용 계산
 ```
-기본 비용: $285/월 (스케줄링 적용)
+기본 비용: $258/월 (스케줄링 적용)
 무중단 배포: $24/월 (월 4회 배포)
-총 운영 비용: $309/월
+총 운영 비용: $282/월
 
-기존 GCP 대비: $420 - $309 = $111/월 절약 (26% 절감)
+기존 GCP 대비: $420 - $282 = $138/월 절약 (33% 절감)
 ```
 
 ## 🧹 코드 정리 및 최적화
@@ -1251,12 +1774,14 @@ Blue Environment (임시):
 
 ### AWS Prod 환경 월 예상 비용 (최적화 적용)
 
-#### 기본 인프라 비용
-- **EC2 인스턴스 (24시간)**: ~$260 (6대)
+#### 기본 인프라 비용 (AI 서버 분리)
+- **EC2 인스턴스 (24시간)**: ~$335 (9대)
   - Backend: t3.medium × 1 (~$30)
-  - AI: g4dn.xlarge × 1 (~$160) - GPU 포함
+  - AI Model: g4dn.xlarge × 1 (~$160) - GPU 포함
+  - AI Serving: t3.medium × 2 (~$60) - 로드밸런싱
   - Database: t3.small × 1 (~$15) - MySQL (24시간)
   - Vector DB: t3.small × 1 (~$15) - PostgreSQL (24시간)
+  - MongoDB: t3.small × 1 (~$15) - NoSQL (24시간)
   - Redis: t3.micro × 1 (~$10)
   - Kafka: t3.medium × 1 (~$30)
 - **NAT Gateway**: ~$45 (1개)
@@ -1265,36 +1790,38 @@ Blue Environment (임시):
 - **Data Transfer**: ~$15
 
 #### 스케줄링 절약 (00:00-08:00 서버 오프)
-- **종료 대상**: Backend + AI + Redis + Kafka = $230/월
-- **8시간 절약**: $230 × (8/24) = $77/월 절약
+- **종료 대상**: Backend + AI Model + AI Serving(2대) + Redis + Kafka = $310/월
+- **8시간 절약**: $310 × (8/24) = $103/월 절약
+- **24시간 운영**: Database + Vector DB + MongoDB = $45/월
 
 #### 무중단 배포 추가 비용
 - **Blue Environment**: 월 4회 배포 × $6/회 = $24/월
 
-#### **최종 총 비용**: ~$273/월
+#### **최종 총 비용**: ~$322/월
 ```
-기본 비용: $350/월
-스케줄링 절약: -$77/월
+기본 비용: $380/월 (AI 서버 분리)
+스케줄링 절약: -$103/월
 무중단 배포 추가: +$24/월
-= $297/월 (반올림하여 $273/월)
+ALB + NAT + 기타: +$21/월
+= $322/월
 ```
 
-### GCP 대비 절감 효과 (최종)
+### GCP 대비 절감 효과 (최종, AI 서버 분리)
 - **현재 GCP 비용**: ~$420/월 (GPU + Vector DB 포함)
-- **AWS 최적화 비용**: ~$273/월 (스케줄링 + 무중단배포)
-- **예상 절감액**: ~$147/월 (35% 절감)
-- **연간 절약**: ~$1,764
+- **AWS 최적화 비용**: ~$322/월 (스케줄링 + 무중단배포 + AI 서버 분리)
+- **예상 절감액**: ~$98/월 (23% 절감)
+- **연간 절약**: ~$1,176
 
 ### 추가 비용 최적화 전략
 
 #### 1. Reserved Instance (RI) 활용
 ```
-현재 On-Demand 비용: $230/월 (스케줄링 적용 후)
-1년 RI 적용 시: $230 × 0.7 = $161/월
-3년 RI 적용 시: $230 × 0.5 = $115/월
+현재 On-Demand 비용: $185/월 (스케줄링 적용 후)
+1년 RI 적용 시: $185 × 0.7 = $130/월
+3년 RI 적용 시: $185 × 0.5 = $93/월
 
-추가 절약: $69~115/월
-최종 비용: $204~158/월
+추가 절약: $55~92/월
+최종 비용: $227~190/월
 ```
 
 #### 2. Spot Instance 활용 (개발/테스트용)
@@ -1351,13 +1878,13 @@ VPC Endpoint 활용:
 - AI (GPU): $107/월 → RI 적용시 $75/월  
 - Redis: $7/월 → RI 적용시 $5/월
 - Kafka: $20/월 → RI 적용시 $14/월
-소계: $108/월 (기존 $154 대비 $46 절약)
+소계: $93/월 (기존 $154 대비 $61 절약)
 
 🔵 무중단 배포:
 - 월 4회 × $6 = $24/월
 
-최대 절약 시 총합: $78.5 + $108 + $24 = $210.5/월
-기존 $273 대비 $62.5/월 추가 절약 가능
+최대 절약 시 총합: $78.5 + $93 + $24 = $195.5/월
+기존 $282 대비 $86.5/월 추가 절약 가능
 ```
 
 ### 향후 확장 계획
@@ -1397,8 +1924,8 @@ def spot_recovery_handler(event, context):
 Spot 적용 후: $57/월 (70% 절약)
 월 절약액: $133/월
 
-전체 운영비: $273 - $133 = $140/월
-GCP 대비 절약: $280/월 (67% 절감)
+전체 운영비: $282 - $133 = $149/월
+GCP 대비 절약: $271/월 (65% 절감)
 ```
 
 #### 구현 우선순위
