@@ -626,11 +626,11 @@ AWS Prod VPC (10.2.0.0/16)
 
 - **태그:**
 
-| Key | Value |
-| :--- | :--- |
-| Name | `aws-prod-alb` |
-| Environment | `prod` |
-| Service | `load-balancer` |
+   | Key | Value |
+   | :--- | :--- |
+   | Name | `aws-prod-alb` |
+   | Environment | `prod` |
+   | Service | `load-balancer` |
 
 ##### 타겟 그룹 생성
 | 이름 | 타겟 타입 | 프로토콜:포트 | VPC | 상태 확인 경로 | 태그 |
@@ -645,12 +645,13 @@ AWS Prod VPC (10.2.0.0/16)
 - **HTTPS (443)**:
   - **SSL 인증서**: `*.test.moongsan.com` (ACM)
   - **규칙**:
-| 우선순위 | 경로 | 전달 대상 |
-| :--- | :--- | :--- |
-| 1 | `/ai/serving-a/*` | `aws-prod-ai-serving-a-tg` |
-| 2 | `/ai/serving-b/*` | `aws-prod-ai-serving-b-tg` |
-| 3 | `/api/*` | `aws-prod-backend-blue-tg` |
-| 기본값 | - | `aws-prod-backend-blue-tg` |
+
+      | 우선순위 | 경로 | 전달 대상 |
+      | :--- | :--- | :--- |
+      | 1 | `/ai/serving-a/*` | `aws-prod-ai-serving-a-tg` |
+      | 2 | `/ai/serving-b/*` | `aws-prod-ai-serving-b-tg` |
+      | 3 | `/api/*` | `aws-prod-backend-blue-tg` |
+      | 기본값 | - | `aws-prod-backend-blue-tg` |
 
 ---
 
