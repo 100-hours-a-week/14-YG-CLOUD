@@ -75,7 +75,7 @@ gcloud services enable cloudkms.googleapis.com
 gcloud auth application-default login
 ```
 
-#### **문제**: "Quota exceeded" 오류
+#### **문제**: "Quota exceeded" 오류 (GCP)
 ```bash
 Error: Quota 'CPUS' exceeded. Limit: 8.0 in region asia-northeast3
 ```
@@ -90,6 +90,83 @@ gcloud compute project-info describe --project=PROJECT_ID
 
 # 3. 임시 해결: 다른 리전 사용
 region = "asia-northeast1"  # terraform.tfvars에서 변경
+```
+
+#### **문제**: AWS vCPU 할당량 초과 오류
+```bash
+Error: creating EC2 Instance: operation error EC2: RunInstances, https response error StatusCode: 400, 
+RequestID: c5624804-71cf-4701-b734-3f8a1776b9a5, api error VcpuLimitExceeded: You have requested more 
+vCPU capacity than your current vCPU limit of 0 allows for the instance bucket that the specified 
+instance type belongs to. Please visit http://aws.amazon.com/contact-us/ec2-request to request an 
+adjustment to this limit.
+
+  with aws_instance.ai_model,
+  on ec2-instances.tf line 119, in resource "aws_instance" "ai_model":
+ 119: resource "aws_instance" "ai_model" {
+```
+
+**원인**: AWS 계정의 On-Demand Standard 인스턴스 vCPU 할당량이 부족함
+
+**해결방법**:
+```bash
+# 1. 현재 vCPU 할당량 확인
+# Standard 인스턴스 할당량 확인
+aws service-quotas get-service-quota \
+  --service-code ec2 \
+  --quota-code L-1216C47A
+
+# GPU 인스턴스 할당량 확인
+aws service-quotas get-service-quota \
+  --service-code ec2 \
+  --quota-code L-DB2E81BA
+
+# 2. Service Quotas에서 할당량 증가 요청
+# AWS Console > Service Quotas > Amazon Elastic Compute Cloud (Amazon EC2) 
+
+# Standard 인스턴스 할당량 증가 (t3, m5 등)
+# > "Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances" 선택
+# > "Request quota increase" 클릭
+
+# GPU 인스턴스 할당량 증가 (g4dn 등)  
+# > "Running On-Demand G and VT instances" 선택
+# > "Request quota increase" 클릭
+
+# 3. 요청 정보 입력
+# - Standard 인스턴스: 32 vCPUs (권장)
+# - GPU 인스턴스: 4 vCPUs (g4dn.xlarge용)
+# - 사용 사례: "AWS Prod 환경 EC2 인스턴스 구축용"
+
+# 4. 요청 상태 확인
+aws service-quotas list-requested-service-quota-change-history \
+  --service-code ec2
+```
+
+**📋 실제 경험 (2025.07.21)**:
+- **Standard 인스턴스 할당량 (1차)**:
+  - **요청 시각**: 14:50 KST
+  - **신청 승인 소요시간**: 약 1분 (매우 빠름)
+  - **실제 할당량 증설 완료**: 14:56 KST (약 6분 소요)
+  - **요청한 할당량**: 32 vCPUs → 50 vCPUs (Standard instances)
+  - **현재 상태**: ✅ 할당량 증설 완료
+- **GPU 인스턴스 할당량 (2차)**:
+  - **요청 시각**: 15:05 KST
+  - **신청 승인 소요시간**: 약 1분 (매우 빠름)
+  - **요청한 할당량**: 0 vCPUs → 4 vCPUs (G and VT instances)
+  - **현재 상태**: 신청 승인됨, 실제 할당량 증설 대기 중
+- **주의사항**: GPU 인스턴스(g4dn.xlarge)는 별도 할당량 "Running On-Demand G and VT instances" 필요
+
+**💡 예방 방법**:
+```bash
+# terraform apply 전에 미리 할당량 확인
+# Standard 인스턴스 할당량 확인
+aws service-quotas get-service-quota --service-code ec2 --quota-code L-1216C47A
+
+# GPU 인스턴스 할당량 확인 
+aws service-quotas get-service-quota --service-code ec2 --quota-code L-DB2E81BA
+
+# 인스턴스 타입별 vCPU 요구사항 확인
+aws ec2 describe-instance-types --instance-types g4dn.xlarge --query 'InstanceTypes[0].VCpuInfo.DefaultVCpus'
+aws ec2 describe-instance-type-offerings --location-type region --region ap-northeast-2
 ```
 
 ### 📊 상태 관리 문제

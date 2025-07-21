@@ -625,6 +625,7 @@ AWS Prod VPC (10.2.0.0/16)
 - **보안 그룹**: `aws-prod-alb-sg`
 
 - **태그:**
+
 | Key | Value |
 | :--- | :--- |
 | Name | `aws-prod-alb` |
