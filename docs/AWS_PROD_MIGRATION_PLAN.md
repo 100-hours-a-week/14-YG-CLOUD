@@ -93,6 +93,24 @@ AWS Prod VPC (10.2.0.0/16)
 - **선택 이유**: 표준 준수, 적절한 보안, 비용 효율성, 확장 가능성, 운영 신뢰성
 - **위험 완화 방안**: NAT Gateway 모니터링 강화, NAT Instance 백업 계획, 향후 NAT Gateway 이중화 검토
 
+**🔄 아키텍처 업데이트 (ALB 멀티 AZ 지원)**:
+```
+AWS Prod VPC (10.2.0.0/16)
+├── Public Subnet (10.2.1.0/24) - ap-northeast-2a
+│   ├── Application Load Balancer (Primary AZ)
+│   └── NAT Gateway (단일, 공유)
+├── Public Subnet (10.2.4.0/24) - ap-northeast-2c
+│   └── Application Load Balancer (Secondary AZ, 고가용성)
+├── Private Subnet (10.2.2.0/24) - ap-northeast-2a
+│   ├── Backend API Server (EC2)
+│   ├── AI Service Server (EC2) - GPU
+│   ├── Redis Server (EC2) - Cache
+│   └── Kafka Cluster (EC2) - Message Queue
+└── Database Subnet (10.2.3.0/24) - ap-northeast-2a
+    ├── Database Server (EC2) - MySQL
+    └── Vector DB Server (EC2) - PostgreSQL + pgvector
+```
+
 ### 서비스 매핑 및 인스턴스 사양
 | GCP 서비스 | AWS 대응 서비스 | 인스턴스 타입 | 가용영역 | 용도 |
 | :--- | :--- | :--- | :--- | :--- |
@@ -154,6 +172,19 @@ AWS Prod VPC (10.2.0.0/16)
 | Key | Value |
 | :--- | :--- |
 | Name | `aws-prod-public-subnet` |
+| Type | `public` |
+| Environment | `prod` |
+
+**서브넷 1-2 - Public (ALB 고가용성용):**
+- **서브넷 이름**: `aws-prod-public-subnet-c`
+- **VPC**: `aws-prod-vpc`
+- **가용 영역**: `ap-northeast-2c`
+- **IPv4 CIDR 블록**: `10.2.4.0/24`
+
+**태그:**
+| Key | Value |
+| :--- | :--- |
+| Name | `aws-prod-public-subnet-c` |
 | Type | `public` |
 | Environment | `prod` |
 
@@ -616,11 +647,11 @@ AWS Prod VPC (10.2.0.0/16)
 ##### ALB 기본 구성
 - **이름**: `aws-prod-alb`
 - **체계**: `Internet-facing`
-- **네트워크**: VPC(`aws-prod-vpc`), 서브넷(`ap-northeast-2a: aws-prod-public-subnet`)
+- **네트워크**: VPC(`aws-prod-vpc`), 서브넷(`ap-northeast-2a: aws-prod-public-subnet`, `ap-northeast-2c: aws-prod-public-subnet-c`)
 
    주의사항:
-   - ALB는 최소 2개 AZ 권장하지만, 단일 AZ로도 운영 가능
-   - 향후 고가용성 필요시 ap-northeast-2c에 추가 퍼블릭 서브넷 생성
+   - ALB는 최소 2개 AZ 필수 (고가용성)
+   - ap-northeast-2a와 ap-northeast-2c에 각각 public 서브넷 필요
 
 - **보안 그룹**: `aws-prod-alb-sg`
 
