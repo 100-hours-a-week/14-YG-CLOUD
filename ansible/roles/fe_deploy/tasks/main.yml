@@ -25,7 +25,7 @@
   npm:
     path: "{{ project_paths.fe_repo }}"
     state: present
-  become: false
+  become: true
 
 - name: Build frontend project
   shell: npm run build
@@ -33,7 +33,7 @@
     chdir: "{{ project_paths.fe_repo }}"
   register: fe_build_result
   failed_when: fe_build_result.rc != 0
-  become: false
+  become: true
 
 - name: Write build log manually
   copy:
